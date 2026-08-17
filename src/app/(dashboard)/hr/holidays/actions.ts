@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth-guards";
 import { assertSafeExcelFile, assertSafeSheetRows, assertSafeWorkbook } from "@/lib/excel-security";
 import { prisma } from "@/lib/prisma";
+import { parseISODateValue, validateBoolean, validateBoundedText, validateRecordId } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import * as XLSX from "@e965/xlsx";
 
@@ -10,15 +11,11 @@ export async function importHolidaysExcel(formData: FormData) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
 
   const file = formData.get("file") as File;
-  const holidayPlanId = formData.get("holidayPlanId") as string;
+  const holidayPlanId = validateRecordId(String(formData.get("holidayPlanId") ?? ""), "Holiday plan");
   if (!file || file.size === 0) {
     throw new Error("No file uploaded or file is empty.");
   }
   assertSafeExcelFile(file);
-  if (!holidayPlanId) {
-    throw new Error("No holiday plan selected.");
-  }
-
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   assertSafeWorkbook(workbook);
@@ -137,31 +134,29 @@ export async function addHolidayManual(
 ) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
 
-  if (!holidayPlanId) {
-    throw new Error("No holiday plan selected.");
-  }
+  const safeHolidayPlanId = validateRecordId(holidayPlanId, "Holiday plan");
+  const safeName = validateBoundedText(name, "Holiday name", 160);
+  const safeDate = parseISODateValue(dateStr, "Holiday date");
+  if (!safeDate) throw new Error("Holiday date is required.");
+  const safeFloaterLeave = validateBoolean(isFloaterLeave, "Floater leave");
+  const safeSpecialHoliday = validateBoolean(specialHoliday, "Special holiday");
 
-  const parsedDate = new Date(dateStr);
-  if (isNaN(parsedDate.getTime())) {
-    throw new Error("Invalid date provided.");
-  }
-
-  const utcDate = new Date(Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()));
+  const utcDate = new Date(Date.UTC(safeDate.getUTCFullYear(), safeDate.getUTCMonth(), safeDate.getUTCDate()));
 
   await prisma.holiday.deleteMany({
     where: {
-      holidayPlanId,
+      holidayPlanId: safeHolidayPlanId,
       date: utcDate,
     },
   });
 
   await prisma.holiday.create({
     data: {
-      name,
+      name: safeName,
       date: utcDate,
-      isFloaterLeave,
-      specialHoliday,
-      holidayPlanId,
+      isFloaterLeave: safeFloaterLeave,
+      specialHoliday: safeSpecialHoliday,
+      holidayPlanId: safeHolidayPlanId,
     },
   });
 
@@ -171,22 +166,22 @@ export async function addHolidayManual(
 
 export async function deleteHoliday(id: string) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
-  await prisma.holiday.delete({ where: { id } });
+  await prisma.holiday.delete({ where: { id: validateRecordId(id, "Holiday") } });
   revalidatePath("/hr/holidays");
   revalidatePath("/employee");
 }
 
 export async function createHolidayPlan(name: string) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
-  if (!name.trim()) throw new Error("Plan name cannot be empty.");
+  const safeName = validateBoundedText(name, "Plan name", 120);
   
   const existing = await prisma.holidayPlan.findUnique({
-    where: { name: name.trim() },
+    where: { name: safeName },
   });
   if (existing) throw new Error("A holiday plan with this name already exists.");
 
   const plan = await prisma.holidayPlan.create({
-    data: { name: name.trim() },
+    data: { name: safeName },
   });
   
   revalidatePath("/hr/holidays");
@@ -195,14 +190,16 @@ export async function createHolidayPlan(name: string) {
 
 export async function assignEmployeesToPlan(planId: string, employeeIds: string[]) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
+  const safePlanId = validateRecordId(planId, "Holiday plan");
+  const safeEmployeeIds = employeeIds.map((id) => validateRecordId(id, "Employee"));
 
   // Update chosen employees' holidayPlanId to this plan
   await prisma.employee.updateMany({
     where: {
-      id: { in: employeeIds },
+      id: { in: safeEmployeeIds },
     },
     data: {
-      holidayPlanId: planId,
+      holidayPlanId: safePlanId,
     },
   });
 

@@ -3,11 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
+import { parseISODateValue, validateBoundedText, validateRecordId } from "@/lib/validation";
+import { isValidAllocationPercentage } from "@/lib/allocation";
 
 export async function submitAllocationRequest(
   message: string
 ) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  const safeMessage = message.trim() ? validateBoundedText(message, "Message", 1000) : null;
 
   // Create allocation request
   await prisma.allocationRequest.create({
@@ -15,7 +18,7 @@ export async function submitAllocationRequest(
       employeeId: user.id,
       projectId: null,
       allocationPercentage: 100,
-      message: message.trim() || null,
+      message: safeMessage,
       status: "PENDING",
     },
   });
@@ -31,9 +34,18 @@ export async function approveAllocationRequest(
   allocationPercentage: number
 ) {
   const user = await requireRole("TS_ADMIN", "HR_ADMIN");
+  const safeRequestId = validateRecordId(requestId, "Allocation request");
+  const safeProjectId = validateRecordId(projectId, "Project");
+  const startDate = parseISODateValue(startDateStr, "Start date");
+  const endDate = parseISODateValue(endDateStr, "End date");
+  if (!startDate) throw new Error("Start date is required.");
+  if (endDate && endDate < startDate) throw new Error("End date can't be before start date.");
+  if (!isValidAllocationPercentage(allocationPercentage)) {
+    throw new Error("Allocation must be between 5% and 100%, in 5% steps.");
+  }
 
   const request = await prisma.allocationRequest.findUnique({
-    where: { id: requestId },
+    where: { id: safeRequestId },
     include: {
       employee: { select: { name: true } },
     },
@@ -47,31 +59,28 @@ export async function approveAllocationRequest(
   }
 
   const approvedProject = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: safeProjectId },
     select: { name: true },
   });
   if (!approvedProject) {
     throw new Error("Selected project not found.");
   }
 
-  const startDate = new Date(startDateStr);
-  const endDate = endDateStr ? new Date(endDateStr) : null;
-
   // Run in transaction to guarantee consistency
   await prisma.$transaction([
     // Update request status, and link the project/percentage determined by admin
     prisma.allocationRequest.update({
-      where: { id: requestId },
+      where: { id: safeRequestId },
       data: { 
         status: "APPROVED",
-        projectId,
+        projectId: safeProjectId,
         allocationPercentage,
       },
     }),
     // Create project allocation
     prisma.projectAllocation.create({
       data: {
-        projectId,
+        projectId: safeProjectId,
         employeeId: request.employeeId,
         allocationPercentage,
         startDate,
@@ -94,9 +103,11 @@ export async function approveAllocationRequest(
 
 export async function rejectAllocationRequest(requestId: string, comment?: string) {
   const user = await requireRole("TS_ADMIN", "HR_ADMIN");
+  const safeRequestId = validateRecordId(requestId, "Allocation request");
+  const safeComment = comment?.trim() ? validateBoundedText(comment, "Comment", 1000) : null;
 
   const request = await prisma.allocationRequest.findUnique({
-    where: { id: requestId },
+    where: { id: safeRequestId },
     include: {
       project: { select: { name: true } },
     },
@@ -113,13 +124,13 @@ export async function rejectAllocationRequest(requestId: string, comment?: strin
 
   await prisma.$transaction([
     prisma.allocationRequest.update({
-      where: { id: requestId },
+      where: { id: safeRequestId },
       data: { status: "REJECTED" },
     }),
     prisma.notification.create({
       data: {
         employeeId: request.employeeId,
-        message: `Allocation Rejected: Your request for "${projectName}" was declined.${comment ? ` Reason: ${comment}` : ""}`,
+        message: `Allocation Rejected: Your request for "${projectName}" was declined.${safeComment ? ` Reason: ${safeComment}` : ""}`,
       },
     }),
   ]);
@@ -131,7 +142,7 @@ export async function dismissNotification(notificationId: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
 
   await prisma.notification.updateMany({
-    where: { id: notificationId, employeeId: user.id },
+    where: { id: validateRecordId(notificationId, "Notification"), employeeId: user.id },
     data: { isRead: true },
   });
 

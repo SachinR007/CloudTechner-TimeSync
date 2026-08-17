@@ -5,16 +5,24 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import { addDays, mondayOf, toISODate } from "@/lib/dates";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
+import { parseISODateValue, validateRecordId } from "@/lib/validation";
 
 function parseLines(formData: FormData) {
   const lines: { taskId: string; workDate: string; hours: number; notes: string }[] = [];
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("hours__")) continue;
     const [, taskId, workDate] = key.split("__");
+    const safeTaskId = validateRecordId(taskId ?? "", "Task");
+    const safeWorkDate = parseISODateValue(workDate, "Work date");
+    if (!safeWorkDate) throw new Error("Work date is required.");
     const hours = Number(value);
     if (Number.isFinite(hours) && hours > 0) {
+      if (hours > 24 || !Number.isInteger(hours * 4)) {
+        throw new Error("Hours must be between 0.25 and 24, in 0.25 hour increments.");
+      }
       const notes = String(formData.get(`notes__${taskId}__${workDate}`) ?? "").trim();
-      lines.push({ taskId, workDate, hours, notes });
+      if (notes.length > 1000) throw new Error("Timesheet notes are too long.");
+      lines.push({ taskId: safeTaskId, workDate: toISODate(safeWorkDate), hours, notes });
     }
   }
   return lines;
@@ -26,7 +34,9 @@ async function upsertTimesheet(
   formData: FormData,
   targetStatus: "DRAFT" | "SUBMITTED"
 ) {
-  const weekStartDate = mondayOf(new Date(`${weekStartISO}T00:00:00.000Z`));
+  const parsedWeekStart = parseISODateValue(weekStartISO, "Week start date");
+  if (!parsedWeekStart) throw new Error("Week start date is required.");
+  const weekStartDate = mondayOf(parsedWeekStart);
   const lines = parseLines(formData);
 
   // Fetch active project allocations for the employee in the relevant timeframe.
@@ -342,7 +352,9 @@ export async function submitTimesheet(weekStartISO: string, formData: FormData) 
 
 export async function withdrawTimesheet(weekStartISO: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
-  const weekStartDate = mondayOf(new Date(`${weekStartISO}T00:00:00.000Z`));
+  const parsedWeekStart = parseISODateValue(weekStartISO, "Week start date");
+  if (!parsedWeekStart) throw new Error("Week start date is required.");
+  const weekStartDate = mondayOf(parsedWeekStart);
 
   const existing = await prisma.timesheetHeader.findUnique({
     where: { employeeId_weekStartDate: { employeeId: user.id, weekStartDate } },
@@ -375,7 +387,7 @@ export async function dismissNotification(notificationId: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
 
   await prisma.notification.update({
-    where: { id: notificationId, employeeId: user.id },
+    where: { id: validateRecordId(notificationId, "Notification"), employeeId: user.id },
     data: { isRead: true },
   });
 

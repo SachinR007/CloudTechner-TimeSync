@@ -6,13 +6,18 @@ import { requireRole } from "@/lib/auth-guards";
 import bcrypt from "bcryptjs";
 import { EmployeeRole } from "@prisma/client";
 import { computeProjectHistory, type ProjectHistoryStint } from "@/lib/project-history";
-
-function str(formData: FormData, key: string): string | null {
-  const v = String(formData.get(key) ?? "").trim();
-  return v === "" ? null : v;
-}
+import {
+  formString,
+  optionalRecordId,
+  requireString,
+  validateBoolean,
+  validateEmail,
+  validateEnum,
+  validateRecordId,
+} from "@/lib/validation";
 
 const MIN_PASSWORD_LENGTH = 8;
+const EMPLOYEE_ROLE_VALUES = ["EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN"] as const;
 
 function validatePassword(password: string) {
   if (password.length < MIN_PASSWORD_LENGTH) {
@@ -26,35 +31,30 @@ function validatePassword(password: string) {
 export async function createEmployee(formData: FormData) {
   await requireRole("HR_ADMIN", "TS_ADMIN");
 
-  const id = str(formData, "id");
-  if (!id) throw new Error("Employee ID is required");
+  const id = validateRecordId(requireString(formData, "id", "Employee ID", { max: 32 }), "Employee ID");
 
   // Check if ID is already in use
   const existingId = await prisma.employee.findUnique({ where: { id } });
   if (existingId) throw new Error(`Employee ID ${id} is already in use`);
 
-  const name = str(formData, "name");
-  if (!name) throw new Error("Employee name is required");
+  const name = requireString(formData, "name", "Employee name", { max: 160 });
 
-  const email = str(formData, "email");
-  if (!email) throw new Error("Employee email is required");
+  const email = validateEmail(requireString(formData, "email", "Employee email", { max: 254 }));
 
   // Check if email is already in use
   const existingEmail = await prisma.employee.findUnique({ where: { email } });
   if (existingEmail) throw new Error(`Email ${email} is already in use`);
 
-  const roleStr = str(formData, "role") || "EMPLOYEE";
-  const role = roleStr as EmployeeRole;
+  const role = validateEnum(formString(formData, "role"), EMPLOYEE_ROLE_VALUES, "EMPLOYEE", "Employee role") as EmployeeRole;
 
-  const phone = str(formData, "phone");
-  const title = str(formData, "title");
-  const reportingManagerId = str(formData, "reportingManagerId");
+  const phone = formString(formData, "phone", { max: 32 });
+  const title = formString(formData, "title", { max: 120 });
+  const reportingManagerId = optionalRecordId(formString(formData, "reportingManagerId"), "Reporting manager");
   if (!reportingManagerId || reportingManagerId === "none") {
     throw new Error("Reporting Manager is required");
   }
-  const approverOverrideRaw = str(formData, "approverOverrideId");
-  const approverOverrideId = approverOverrideRaw === "none" ? null : approverOverrideRaw;
-  const password = str(formData, "password");
+  const approverOverrideId = optionalRecordId(formString(formData, "approverOverrideId"), "Approver override");
+  const password = formString(formData, "password", { max: 128 });
   if (!password) throw new Error("Login password is required.");
   validatePassword(password);
 
@@ -81,16 +81,18 @@ export async function createEmployee(formData: FormData) {
 
 export async function toggleEmployeeActive(id: string, isActive: boolean) {
   await requireRole("HR_ADMIN", "TS_ADMIN");
+  const employeeId = validateRecordId(id, "Employee");
+  const active = validateBoolean(isActive, "Employee status");
 
   // Prevent HR admin from deactivating themselves
   const sessionUser = await requireRole("HR_ADMIN", "TS_ADMIN");
-  if (sessionUser.id === id && !isActive) {
+  if (sessionUser.id === employeeId && !active) {
     throw new Error("You cannot deactivate your own profile.");
   }
 
   await prisma.employee.update({
-    where: { id },
-    data: { isActive },
+    where: { id: employeeId },
+    data: { isActive: active },
   });
 
   revalidatePath("/hr/employees");
@@ -103,28 +105,27 @@ export type ProjectHistoryEntry = ProjectHistoryStint;
 
 export async function getEmployeeProjectHistory(employeeId: string): Promise<ProjectHistoryEntry[]> {
   await requireRole("HR_ADMIN", "TS_ADMIN");
-  return computeProjectHistory(employeeId);
+  return computeProjectHistory(validateRecordId(employeeId, "Employee"));
 }
 
 export async function updateEmployee(id: string, formData: FormData) {
   await requireRole("HR_ADMIN", "TS_ADMIN");
+  const employeeId = validateRecordId(id, "Employee");
 
-  const name = str(formData, "name");
-  if (!name) throw new Error("Employee name is required");
+  const name = requireString(formData, "name", "Employee name", { max: 160 });
 
-  const roleStr = str(formData, "role") || "EMPLOYEE";
-  const role = roleStr as EmployeeRole;
+  const role = validateEnum(formString(formData, "role"), EMPLOYEE_ROLE_VALUES, "EMPLOYEE", "Employee role") as EmployeeRole;
 
-  const phone = str(formData, "phone");
-  const title = str(formData, "title");
+  const phone = formString(formData, "phone", { max: 32 });
+  const title = formString(formData, "title", { max: 120 });
 
-  const reportingManagerId = str(formData, "reportingManagerId");
+  const reportingManagerId = optionalRecordId(formString(formData, "reportingManagerId"), "Reporting manager");
   if (!reportingManagerId || reportingManagerId === "none") {
     throw new Error("Reporting Manager is required");
   }
 
-  const approverOverrideId = str(formData, "approverOverrideId");
-  const password = str(formData, "password");
+  const approverOverrideId = optionalRecordId(formString(formData, "approverOverrideId"), "Approver override");
+  const password = formString(formData, "password", { max: 128 });
 
   const updateData: any = {
     name,
@@ -132,7 +133,7 @@ export async function updateEmployee(id: string, formData: FormData) {
     phone,
     title,
     reportingManagerId,
-    approverOverrideId: approverOverrideId === "none" ? null : approverOverrideId,
+    approverOverrideId,
   };
 
   if (password && password.trim() !== "") {
@@ -141,7 +142,7 @@ export async function updateEmployee(id: string, formData: FormData) {
   }
 
   await prisma.employee.update({
-    where: { id },
+    where: { id: employeeId },
     data: updateData,
   });
 

@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
+import { parseISODateValue, validateBoundedText, validateRecordId } from "@/lib/validation";
 
 export async function approveLateSubmission(timesheetHeaderId: string) {
   const user = await requireRole("HR_ADMIN");
+  const safeHeaderId = validateRecordId(timesheetHeaderId, "Timesheet");
 
   await prisma.$transaction(async (tx) => {
     // 1. Update lateApproved to true
     const timesheet = await tx.timesheetHeader.update({
-      where: { id: timesheetHeaderId },
+      where: { id: safeHeaderId },
       data: {
         lateApproved: true,
       },
@@ -51,14 +53,18 @@ export async function approveLateSubmission(timesheetHeaderId: string) {
 
 export async function rejectLateSubmission(timesheetHeaderId: string, comments: string) {
   const user = await requireRole("HR_ADMIN");
+  const safeHeaderId = validateRecordId(timesheetHeaderId, "Timesheet");
+  const safeComments = comments.trim()
+    ? validateBoundedText(comments, "Rejection comments", 1000)
+    : "Late submission rejected by HR Admin.";
 
   await prisma.$transaction(async (tx) => {
     // 1. Update status to REJECTED and rejection comments
     const timesheet = await tx.timesheetHeader.update({
-      where: { id: timesheetHeaderId },
+      where: { id: safeHeaderId },
       data: {
         status: "REJECTED",
-        rejectionComments: comments || "Late submission rejected by HR Admin.",
+        rejectionComments: safeComments,
       },
     });
 
@@ -68,7 +74,7 @@ export async function rejectLateSubmission(timesheetHeaderId: string, comments: 
         timesheetHeaderId: timesheet.id,
         actorId: user.id,
         action: "LATE_REJECTED",
-        comments: comments || "Late submission rejected by HR Admin.",
+        comments: safeComments,
       },
     });
   });
@@ -79,17 +85,20 @@ export async function rejectLateSubmission(timesheetHeaderId: string, comments: 
 
 export async function sendTimesheetReminder(employeeId: string, weekStartISO: string) {
   const user = await requireRole("HR_ADMIN");
+  const safeEmployeeId = validateRecordId(employeeId, "Employee");
+  const weekStartDate = parseISODateValue(weekStartISO, "Week start date");
+  if (!weekStartDate) throw new Error("Week start date is required.");
 
   const employee = await prisma.employee.findUniqueOrThrow({
-    where: { id: employeeId },
+    where: { id: safeEmployeeId },
     select: { name: true, reportingManagerId: true },
   });
 
   // 1. Notify employee
   await prisma.notification.create({
     data: {
-      employeeId,
-      message: "Hr asked to fill the timesheet",
+      employeeId: safeEmployeeId,
+      message: `HR asked to fill the timesheet for ${weekStartDate.toISOString().slice(0, 10)}.`,
     },
   });
 

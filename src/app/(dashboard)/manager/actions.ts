@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import type { Prisma } from "@prisma/client";
+import { validateBoundedText, validateRecordId } from "@/lib/validation";
 
 // Recompute the parent week's status from its per-project approval slices:
 // REJECTED if any slice is rejected; APPROVED once every slice is approved;
@@ -30,9 +31,10 @@ async function rollupHeaderStatus(tx: Prisma.TransactionClient, timesheetHeaderI
 // Approve one project's slice of a submitted week.
 export async function approveProjectApproval(approvalId: string) {
   const manager = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  const safeApprovalId = validateRecordId(approvalId, "Approval");
 
   const approval = await prisma.timesheetApproval.findUniqueOrThrow({
-    where: { id: approvalId },
+    where: { id: safeApprovalId },
     include: {
       timesheetHeader: { select: { id: true, employeeId: true, isLate: true, lateApproved: true } },
     },
@@ -46,7 +48,7 @@ export async function approveProjectApproval(approvalId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.timesheetApproval.update({
-      where: { id: approvalId },
+      where: { id: safeApprovalId },
       data: { status: "APPROVED", approvedAt: new Date() },
     });
     await tx.approvalHistory.create({
@@ -63,10 +65,11 @@ export async function approveProjectApproval(approvalId: string) {
 // Reject one project's slice (rejects the whole week back to the employee).
 export async function rejectProjectApproval(approvalId: string, comments: string) {
   const manager = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
-  if (!comments.trim()) throw new Error("Rejection comments are required.");
+  const safeApprovalId = validateRecordId(approvalId, "Approval");
+  const safeComments = validateBoundedText(comments, "Rejection comments", 1000);
 
   const approval = await prisma.timesheetApproval.findUniqueOrThrow({
-    where: { id: approvalId },
+    where: { id: safeApprovalId },
     include: {
       timesheetHeader: { select: { id: true, employeeId: true, isLate: true, lateApproved: true } },
     },
@@ -80,11 +83,11 @@ export async function rejectProjectApproval(approvalId: string, comments: string
 
   await prisma.$transaction(async (tx) => {
     await tx.timesheetApproval.update({
-      where: { id: approvalId },
-      data: { status: "REJECTED", comments },
+      where: { id: safeApprovalId },
+      data: { status: "REJECTED", comments: safeComments },
     });
     await tx.approvalHistory.create({
-      data: { timesheetHeaderId: approval.timesheetHeader.id, actorId: manager.id, action: "REJECTED", comments },
+      data: { timesheetHeaderId: approval.timesheetHeader.id, actorId: manager.id, action: "REJECTED", comments: safeComments },
     });
     await rollupHeaderStatus(tx, approval.timesheetHeader.id);
   });

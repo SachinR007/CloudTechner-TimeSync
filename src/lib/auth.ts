@@ -18,7 +18,7 @@ async function findActiveEmployeeByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true },
+    select: { id: true, name: true, email: true, role: true, updatedAt: true },
   });
 }
 
@@ -28,8 +28,20 @@ async function findActiveEmployeeCredentialsByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true, passwordHash: true },
+    select: { id: true, name: true, email: true, role: true, passwordHash: true, updatedAt: true },
   });
+}
+
+async function validateSessionToken(employeeId?: string, sessionVersion?: string) {
+  if (!employeeId || !sessionVersion) return null;
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { id: true, role: true, isActive: true, updatedAt: true },
+  });
+  if (!employee?.isActive) return null;
+  const currentVersion = employee.updatedAt.toISOString();
+  if (currentVersion !== sessionVersion) return null;
+  return { role: employee.role, sessionVersion: currentVersion };
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -74,6 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 name: employee.name,
                 email: employee.email,
                 role: employee.role,
+                sessionVersion: employee.updatedAt.toISOString(),
               };
             },
           }),
@@ -109,14 +122,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       user.name = employee.name;
       user.email = employee.email;
       user.role = employee.role;
+      user.sessionVersion = employee.updatedAt.toISOString();
       console.info("SSO success.", { employeeId: employee.id, email: employee.email });
       return true;
     },
-    jwt: ({ token, user }) => {
+    jwt: async ({ token, user }) => {
       if (user) {
         token.employeeId = user.id;
         token.role = (user as { role: Role }).role;
+        token.sessionVersion = (user as { sessionVersion?: string }).sessionVersion;
+        return token;
       }
+
+      const current = await validateSessionToken(token.employeeId as string | undefined, token.sessionVersion as string | undefined);
+      if (!current) {
+        return null;
+      }
+      token.role = current.role;
+      token.sessionVersion = current.sessionVersion;
       return token;
     },
     session: ({ session, token }) => {

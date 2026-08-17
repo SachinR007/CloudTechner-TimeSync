@@ -234,7 +234,16 @@ async function runChecks() {
     throw new Error(`Header check failed: ${JSON.stringify(headers)}`);
   }
 
-  console.log(JSON.stringify({ employeeRows, adminRows, headers }, null, 2));
+  await prisma.employee.update({
+    where: { id: "SECEMP" },
+    data: { title: "Session revoked by regression test" },
+  });
+  const revokedSession = await request(employee, "/employee");
+  if (![302, 303, 307, 401].includes(revokedSession.status)) {
+    throw new Error(`Session revocation check failed: ${revokedSession.status}`);
+  }
+
+  console.log(JSON.stringify({ employeeRows, adminRows, headers, revokedSession: { status: revokedSession.status } }, null, 2));
 }
 
 async function stopServer(child: ChildProcessWithoutNullStreams) {

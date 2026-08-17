@@ -4,6 +4,16 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import type { BillingModel, ProjectStatus, CommentsCriteria } from "@prisma/client";
+import {
+  formString,
+  optionalRecordId,
+  parseDecimalFromForm,
+  parseISODateFromForm,
+  requireString,
+  validateBoolean,
+  validateEnum,
+  validateRecordId,
+} from "@/lib/validation";
 
 const DEFAULT_TASK_TEMPLATE = ["Project work", "Project work - WFH", "Project work - Client", "Training"];
 
@@ -11,48 +21,36 @@ const PROJECT_STATUS_VALUES = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "COMPLET
 const BILLING_MODEL_VALUES = ["TIME_AND_MATERIAL", "FIXED_FEE", "RETAINER", "NON_BILLABLE"];
 const COMMENTS_CRITERIA_VALUES = ["NOT_REQUIRED", "COMPULSORY", "LESS_THAN_8_HOURS", "MORE_THAN_8_HOURS"];
 
-function str(formData: FormData, key: string): string | null {
-  const v = String(formData.get(key) ?? "").trim();
-  return v === "" ? null : v;
-}
-
-function parseDate(formData: FormData, key: string): Date | null {
-  const v = str(formData, key);
-  return v ? new Date(`${v}T00:00:00.000Z`) : null;
-}
-
-function parseDecimal(formData: FormData, key: string): number | null {
-  const v = str(formData, key);
-  if (v === null) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
 export async function createProject(formData: FormData) {
   await requireRole("TS_ADMIN");
 
-  const clientId = str(formData, "clientId");
-  const name = str(formData, "name");
-  const code = str(formData, "code");
+  const clientId = validateRecordId(requireString(formData, "clientId", "Client"), "Client");
+  const name = requireString(formData, "name", "Project name", { max: 160 });
+  const code = formString(formData, "code", { max: 32 });
 
-  if (!clientId) throw new Error("Client is required");
-  if (!name) throw new Error("Project name is required");
   if (code) {
     const existing = await prisma.project.findUnique({ where: { code } });
     if (existing) throw new Error(`Project code ${code} is already in use`);
   }
 
-  const statusRaw = str(formData, "status") ?? "IN_PROGRESS";
-  const status = (PROJECT_STATUS_VALUES.includes(statusRaw) ? statusRaw : "IN_PROGRESS") as ProjectStatus;
+  const status = validateEnum(formString(formData, "status"), PROJECT_STATUS_VALUES, "IN_PROGRESS", "Project status") as ProjectStatus;
 
-  const billingRaw = str(formData, "billingModel") ?? "TIME_AND_MATERIAL";
-  const billingModel = (BILLING_MODEL_VALUES.includes(billingRaw) ? billingRaw : "TIME_AND_MATERIAL") as BillingModel;
+  const billingModel = validateEnum(
+    formString(formData, "billingModel"),
+    BILLING_MODEL_VALUES,
+    "TIME_AND_MATERIAL",
+    "Billing model"
+  ) as BillingModel;
 
-  const commentsCriteriaRaw = str(formData, "commentsCriteria") ?? "COMPULSORY";
-  const commentsCriteria = (COMMENTS_CRITERIA_VALUES.includes(commentsCriteriaRaw) ? commentsCriteriaRaw : "COMPULSORY") as CommentsCriteria;
+  const commentsCriteria = validateEnum(
+    formString(formData, "commentsCriteria"),
+    COMMENTS_CRITERIA_VALUES,
+    "COMPULSORY",
+    "Comments criteria"
+  ) as CommentsCriteria;
 
-  const startDate = parseDate(formData, "startDate");
-  const endDate = parseDate(formData, "endDate");
+  const startDate = parseISODateFromForm(formData, "startDate", "Start date");
+  const endDate = parseISODateFromForm(formData, "endDate", "End date");
   if (startDate && endDate && endDate < startDate) {
     throw new Error("End date can't be before start date");
   }
@@ -63,12 +61,12 @@ export async function createProject(formData: FormData) {
       name,
       code,
       status,
-      projectManagerId: str(formData, "projectManagerId"),
-      description: str(formData, "description"),
+      projectManagerId: optionalRecordId(formString(formData, "projectManagerId"), "Project manager"),
+      description: formString(formData, "description", { max: 2000 }),
       startDate,
       endDate,
-      costBudget: parseDecimal(formData, "costBudget"),
-      hoursBudget: parseDecimal(formData, "hoursBudget"),
+      costBudget: parseDecimalFromForm(formData, "costBudget", "Cost budget", { min: 0 }),
+      hoursBudget: parseDecimalFromForm(formData, "hoursBudget", "Hours budget", { min: 0 }),
       billingModel,
       commentsCriteria,
       linkExpenses: formData.get("linkExpenses") === "on",
@@ -88,32 +86,39 @@ export async function createProject(formData: FormData) {
 
 export async function toggleProjectActive(id: string, isActive: boolean) {
   await requireRole("TS_ADMIN");
-  await prisma.project.update({ where: { id }, data: { isActive } });
+  await prisma.project.update({ where: { id: validateRecordId(id, "Project") }, data: { isActive: validateBoolean(isActive, "Project status") } });
   revalidatePath("/admin/projects");
 }
 
 export async function updateProject(id: string, formData: FormData) {
   const admin = await requireRole("TS_ADMIN");
 
-  const name = str(formData, "name");
-  if (!name) throw new Error("Project name is required");
+  const projectId = validateRecordId(id, "Project");
+  const name = requireString(formData, "name", "Project name", { max: 160 });
 
-  const statusRaw = str(formData, "status") ?? "IN_PROGRESS";
-  const status = (PROJECT_STATUS_VALUES.includes(statusRaw) ? statusRaw : "IN_PROGRESS") as ProjectStatus;
+  const status = validateEnum(formString(formData, "status"), PROJECT_STATUS_VALUES, "IN_PROGRESS", "Project status") as ProjectStatus;
 
-  const billingRaw = str(formData, "billingModel") ?? "TIME_AND_MATERIAL";
-  const billingModel = (BILLING_MODEL_VALUES.includes(billingRaw) ? billingRaw : "TIME_AND_MATERIAL") as BillingModel;
+  const billingModel = validateEnum(
+    formString(formData, "billingModel"),
+    BILLING_MODEL_VALUES,
+    "TIME_AND_MATERIAL",
+    "Billing model"
+  ) as BillingModel;
 
-  const commentsCriteriaRaw = str(formData, "commentsCriteria") ?? "COMPULSORY";
-  const commentsCriteria = (COMMENTS_CRITERIA_VALUES.includes(commentsCriteriaRaw) ? commentsCriteriaRaw : "COMPULSORY") as CommentsCriteria;
+  const commentsCriteria = validateEnum(
+    formString(formData, "commentsCriteria"),
+    COMMENTS_CRITERIA_VALUES,
+    "COMPULSORY",
+    "Comments criteria"
+  ) as CommentsCriteria;
 
-  const startDate = parseDate(formData, "startDate");
-  const endDate = parseDate(formData, "endDate");
+  const startDate = parseISODateFromForm(formData, "startDate", "Start date");
+  const endDate = parseISODateFromForm(formData, "endDate", "End date");
   if (startDate && endDate && endDate < startDate) {
     throw new Error("End date can't be before start date");
   }
 
-  const existingProject = await prisma.project.findUniqueOrThrow({ where: { id } });
+  const existingProject = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
 
   let descriptionAppend = "";
   if (endDate) {
@@ -147,20 +152,20 @@ export async function updateProject(id: string, formData: FormData) {
     }
   }
 
-  const currentDesc = str(formData, "description") ?? "";
+  const currentDesc = formString(formData, "description", { max: 2000 }) ?? "";
   const finalDesc = currentDesc + descriptionAppend;
 
   await prisma.project.update({
-    where: { id },
+    where: { id: projectId },
     data: {
       name,
       status,
-      projectManagerId: str(formData, "projectManagerId"),
+      projectManagerId: optionalRecordId(formString(formData, "projectManagerId"), "Project manager"),
       description: finalDesc || null,
       startDate,
       endDate,
-      costBudget: parseDecimal(formData, "costBudget"),
-      hoursBudget: parseDecimal(formData, "hoursBudget"),
+      costBudget: parseDecimalFromForm(formData, "costBudget", "Cost budget", { min: 0 }),
+      hoursBudget: parseDecimalFromForm(formData, "hoursBudget", "Hours budget", { min: 0 }),
       billingModel,
       commentsCriteria,
       linkExpenses: formData.get("linkExpenses") === "on",
@@ -168,5 +173,5 @@ export async function updateProject(id: string, formData: FormData) {
   });
 
   revalidatePath("/admin/projects");
-  revalidatePath(`/admin/projects/${id}`);
+  revalidatePath(`/admin/projects/${projectId}`);
 }

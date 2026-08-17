@@ -3,6 +3,7 @@
 import { signOut, auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { validateBoundedText } from "@/lib/validation";
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
@@ -12,9 +13,9 @@ export async function changePasswordAction(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const currentPassword = formData.get("currentPassword") as string;
-  const newPassword = formData.get("newPassword") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   if (!currentPassword || !newPassword || !confirmPassword) {
     throw new Error("All fields are required");
@@ -24,8 +25,15 @@ export async function changePasswordAction(formData: FormData) {
     throw new Error("New passwords do not match");
   }
 
-  if (newPassword.length < 6) {
-    throw new Error("Password must be at least 6 characters long");
+  validateBoundedText(currentPassword, "Current password", 128);
+  validateBoundedText(newPassword, "New password", 128);
+
+  if (newPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
+  }
+
+  if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+    throw new Error("Password must contain at least one letter and one number.");
   }
 
   const employee = await prisma.employee.findUnique({
