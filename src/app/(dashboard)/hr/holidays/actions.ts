@@ -1,9 +1,10 @@
 "use server";
 
 import { requireRole } from "@/lib/auth-guards";
+import { assertSafeExcelFile, assertSafeSheetRows, assertSafeWorkbook } from "@/lib/excel-security";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 
 export async function importHolidaysExcel(formData: FormData) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
@@ -13,12 +14,14 @@ export async function importHolidaysExcel(formData: FormData) {
   if (!file || file.size === 0) {
     throw new Error("No file uploaded or file is empty.");
   }
+  assertSafeExcelFile(file);
   if (!holidayPlanId) {
     throw new Error("No holiday plan selected.");
   }
 
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
+  assertSafeWorkbook(workbook);
 
   // Find Holiday Details sheet
   const sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes("holiday"));
@@ -27,6 +30,7 @@ export async function importHolidaysExcel(formData: FormData) {
   }
 
   const sheet = workbook.Sheets[sheetName];
+  assertSafeSheetRows(sheet);
   const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
 
   // Clean rows

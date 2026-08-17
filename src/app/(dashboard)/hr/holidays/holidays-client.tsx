@@ -28,7 +28,7 @@ import {
   createHolidayPlan,
   assignEmployeesToPlan
 } from "./actions";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { Search, Calendar, Plus, FileSpreadsheet, Trash2, Users, Check, AlertTriangle, Briefcase, HelpCircle } from "lucide-react";
 import Link from "next/link";
 

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { mondayOf, toISODate, addDays } from "@/lib/dates";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 export default async function AdminDashboard() {
   const user = await requireRole("TS_ADMIN");
@@ -91,7 +92,7 @@ export default async function AdminDashboard() {
       employee: { isActive: true },
     },
     include: {
-      employee: true,
+      employee: { select: employeeOptionSelect },
       project: true,
     },
   });

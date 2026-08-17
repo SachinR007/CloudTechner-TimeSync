@@ -5,6 +5,7 @@ import { CreateEmployeeDialog } from "./create-employee-dialog";
 import { requireRole } from "@/lib/auth-guards";
 import { mondayOf } from "@/lib/dates";
 import { EmployeeList } from "./employee-list";
+import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
 
 export default async function EmployeesPage() {
   // Protect page for HR_ADMIN and TS_ADMIN
@@ -17,9 +18,8 @@ export default async function EmployeesPage() {
   const [employeesData, activeEmployees, suggestedId] = await Promise.all([
     prisma.employee.findMany({
       orderBy: { id: "asc" },
-      include: {
-        reportingManager: true,
-        approverOverride: true,
+      select: {
+        ...employeeSafeSelect,
         allocations: {
           // Only count allocations on still-active projects toward an
           // employee's total % and project badges -- a deactivated project
@@ -44,11 +44,14 @@ export default async function EmployeesPage() {
           include: {
             lines: true
           }
-        }
-      }
+        },
+        reportingManager: { select: employeeOptionSelect },
+        approverOverride: { select: employeeOptionSelect },
+      },
     }),
     prisma.employee.findMany({
       where: { isActive: true },
+      select: { ...employeeOptionSelect, role: true },
       orderBy: { name: "asc" },
     }),
     nextEmployeeCode(),

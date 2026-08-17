@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HistoryList } from "./history-list";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 export default async function TimesheetHistoryPage() {
   await requireRole("TS_ADMIN", "HR_ADMIN");
@@ -11,10 +12,10 @@ export default async function TimesheetHistoryPage() {
     prisma.approvalHistory.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        actor: true,
+        actor: { select: employeeOptionSelect },
         timesheetHeader: {
           include: {
-            employee: true,
+            employee: { select: employeeOptionSelect },
             lines: {
               include: {
                 task: {

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileSpreadsheet, Download, FileDown } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { previewTimesheetImport, commitTimesheetImport, exportTimesheets } from "./actions";
 import {
   type ImportPreviewResult,

@@ -7,7 +7,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { mondayOf, toISODate } from "@/lib/dates";
-import * as XLSX from "xlsx";
+import { employeeOptionSelect } from "@/lib/safe-selects";
+import { assertSafeSheetRows, assertSafeWorkbook } from "@/lib/excel-security";
+import * as XLSX from "@e965/xlsx";
 
 export type ParsedTimesheetRow = {
   employeeId: string;
@@ -67,7 +69,9 @@ function findHeaderRowIndex(rows: any[][]): number {
 
 export async function buildPreviewReport(buffer: ArrayBuffer): Promise<ImportPreviewResult> {
   const workbook = XLSX.read(buffer, { type: "array" });
+  assertSafeWorkbook(workbook);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  assertSafeSheetRows(sheet);
   const rawRows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
   const headerRowIdx = findHeaderRowIndex(rawRows);
@@ -626,7 +630,12 @@ export async function buildExportRows(params: {
     },
     include: {
       task: { include: { project: { include: { client: true } } } },
-      timesheetHeader: { include: { employee: true, approvedBy: true } },
+      timesheetHeader: {
+        include: {
+          employee: { select: employeeOptionSelect },
+          approvedBy: { select: employeeOptionSelect },
+        },
+      },
     },
     orderBy: [{ workDate: "asc" }],
   });

@@ -15,6 +15,7 @@ import {
 import { ToggleActiveButton } from "@/components/toggle-active-button";
 import { CreateProjectDialog } from "./create-project-dialog";
 import { toggleProjectActive } from "./actions";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 function fmtDate(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : "—";
@@ -26,12 +27,12 @@ export default async function ProjectsPage() {
       orderBy: { createdAt: "desc" },
       include: {
         client: true,
-        projectManager: true,
+        projectManager: { select: employeeOptionSelect },
         _count: { select: { tasks: true, allocations: true } },
       },
     }),
     prisma.client.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    prisma.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.employee.findMany({ where: { isActive: true }, select: employeeOptionSelect, orderBy: { name: "asc" } }),
     nextProjectCode(),
   ]);
 

@@ -16,6 +16,7 @@ import { EditProjectDialog } from "./edit-project-dialog";
 import { EditTaskDialog } from "./edit-task-dialog";
 import { toggleTaskActive } from "./actions";
 import { allocationStatusFor } from "@/lib/allocation";
+import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
 
 const STALE_DAYS = 30;
 
@@ -32,11 +33,12 @@ export default async function ProjectDetailPage({
       include: {
         client: true,
         tasks: { orderBy: { name: "asc" } },
-        allocations: { include: { employee: true }, orderBy: { startDate: "desc" } },
+        allocations: { include: { employee: { select: employeeSafeSelect } }, orderBy: { startDate: "desc" } },
       },
     }),
     prisma.employee.findMany({
       where: { isActive: true },
+      select: employeeOptionSelect,
       orderBy: { name: "asc" },
     }),
   ]);

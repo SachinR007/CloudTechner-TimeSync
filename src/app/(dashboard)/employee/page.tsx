@@ -22,6 +22,7 @@ import { EmployeeTabs } from "./employee-tabs";
 import { allocationStatusFor } from "@/lib/allocation";
 import { computeProjectHistory } from "@/lib/project-history";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 const STATUS_VARIANT = {
   DRAFT: "secondary",
@@ -114,7 +115,7 @@ export default async function EmployeeDashboard({
     where: { employeeId_weekStartDate: { employeeId: user.id, weekStartDate: weekStart } },
     include: {
       lines: true,
-      approvedBy: true,
+      approvedBy: { select: employeeOptionSelect },
       approvalHistory: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });

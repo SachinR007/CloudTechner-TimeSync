@@ -18,6 +18,16 @@ async function findActiveEmployeeByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
+    select: { id: true, name: true, email: true, role: true },
+  });
+}
+
+async function findActiveEmployeeCredentialsByEmail(email: string) {
+  return prisma.employee.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isActive: true,
+    },
     select: { id: true, name: true, email: true, role: true, passwordHash: true },
   });
 }
@@ -53,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               const password = credentials?.password as string | undefined;
               if (!email || !password) return null;
 
-              const employee = await findActiveEmployeeByEmail(email);
+              const employee = await findActiveEmployeeCredentialsByEmail(email);
               if (!employee) return null;
 
               const valid = await bcrypt.compare(password, employee.passwordHash);

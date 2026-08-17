@@ -30,6 +30,7 @@ export async function changePasswordAction(formData: FormData) {
 
   const employee = await prisma.employee.findUnique({
     where: { id: session.user.id },
+    select: { passwordHash: true },
   });
 
   if (!employee) throw new Error("Employee not found");

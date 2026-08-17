@@ -1,6 +1,7 @@
 "use server";
 
 import { requireRole } from "@/lib/auth-guards";
+import { assertSafeExcelFile } from "@/lib/excel-security";
 import { revalidatePath } from "next/cache";
 import {
   buildPreviewReport,
@@ -25,6 +26,7 @@ export async function previewTimesheetImport(formData: FormData): Promise<Import
   if (!file || file.size === 0) {
     throw new Error("No file uploaded or file is empty.");
   }
+  assertSafeExcelFile(file);
 
   const buffer = await file.arrayBuffer();
   return buildPreviewReport(buffer);

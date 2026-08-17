@@ -13,6 +13,7 @@ import { SortHeader } from "@/components/sort-header";
 import { CreateAllocationDialog } from "./create-allocation-dialog";
 import { AllocationRowActions } from "./allocation-row-actions";
 import { allocationStatusFor, type AllocationStatusLabel } from "@/lib/allocation";
+import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
 
 const SORT_KEYS = ["employee", "project", "percentage", "start", "end", "status"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -41,9 +42,9 @@ export default async function AllocationsPage({
 
   const [allocations, employees, projects] = await Promise.all([
     prisma.projectAllocation.findMany({
-      include: { employee: true, project: true },
+      include: { employee: { select: employeeSafeSelect }, project: true },
     }),
-    prisma.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.employee.findMany({ where: { isActive: true }, select: employeeOptionSelect, orderBy: { name: "asc" } }),
     prisma.project.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
   ]);
 

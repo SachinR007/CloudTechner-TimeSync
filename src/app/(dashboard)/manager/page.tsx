@@ -15,6 +15,7 @@ import type { ReviewLine } from "./review-dialog";
 import { ApprovalFilters } from "./approval-filters";
 import { GroupedApprovalsTable, type ApprovalRowData } from "./grouped-approvals-table";
 import type { Prisma } from "@prisma/client";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 export default async function ManagerDashboard({
   searchParams,
@@ -56,7 +57,7 @@ export default async function ManagerDashboard({
         project: { select: { id: true, name: true } },
         timesheetHeader: {
           include: {
-            employee: true,
+            employee: { select: employeeOptionSelect },
             lines: { include: { task: { include: { project: { include: { client: true } } } } } },
             approvalHistory: { orderBy: { createdAt: "desc" }, take: 1 },
           },
@@ -66,7 +67,7 @@ export default async function ManagerDashboard({
     }),
     prisma.timesheetApproval.findMany({
       where: { approverId: user.id, status: { in: ["APPROVED", "REJECTED"] } },
-      include: { project: { select: { name: true } }, timesheetHeader: { include: { employee: true } } },
+      include: { project: { select: { name: true } }, timesheetHeader: { include: { employee: { select: employeeOptionSelect } } } },
       orderBy: { updatedAt: "desc" },
       take: 10,
     }),

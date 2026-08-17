@@ -18,7 +18,7 @@
 // Usage:
 //   npx tsx scripts/import-timesheets.ts > scripts/import-timesheets.sql
 
-import xlsx from "xlsx";
+import xlsx from "@e965/xlsx";
 import { randomUUID } from "node:crypto";
 
 const FILE = "Employees Timesheet Entries Report - CLOUDTECHNER SERVICES PRIVATE LIMITED (1).xlsx";
@@ -39,11 +39,11 @@ function readRows(): Row[] {
   const wb = xlsx.readFile(FILE);
   const raw = xlsx.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 });
   const headers = raw[2] as string[];
-  return raw.slice(3).map((r) => {
+  return raw.slice(3).map((r: any[]) => {
     const o: any = {};
     headers.forEach((h, i) => (o[h] = r[i]));
     return o as Row;
-  }).filter((r) => r["Employee Number"]);
+  }).filter((r: Row) => r["Employee Number"]);
 }
 
 function excelDateToISO(serial: number): string {

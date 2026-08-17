@@ -21,7 +21,7 @@
 //   npx tsx scripts/import-roster.ts > scripts/import-roster.sql
 // Then review scripts/import-roster.sql and run it with psql.
 
-import xlsx from "xlsx";
+import xlsx from "@e965/xlsx";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 
@@ -67,7 +67,7 @@ function sql(s: string | null): string {
 
 function main() {
   const contacts = readSheet<ContactRow>(CONTACT_FILE);
-  const projectRows = readSheet<ProjectRow>(PROJECT_FILE).filter((r) => r["Employee Number"]);
+  const projectRows = readSheet<ProjectRow>(PROJECT_FILE).filter((r: ProjectRow) => r["Employee Number"]);
 
   const contactById = new Map(contacts.map((c) => [c["Employee Number"], c]));
   const nameToId = new Map(contacts.map((c) => [c["Full Name"], c["Employee Number"]]));

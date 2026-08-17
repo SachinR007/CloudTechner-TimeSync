@@ -13,17 +13,18 @@ import {
 import { ToggleActiveButton } from "@/components/toggle-active-button";
 import { CreateClientDialog } from "./create-client-dialog";
 import { toggleClientActive } from "./actions";
+import { employeeOptionSelect } from "@/lib/safe-selects";
 
 export default async function ClientsPage() {
   const [clients, employees, suggestedCode] = await Promise.all([
     prisma.client.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        clientManager: true,
+        clientManager: { select: employeeOptionSelect },
         _count: { select: { projects: true } },
       },
     }),
-    prisma.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.employee.findMany({ where: { isActive: true }, select: employeeOptionSelect, orderBy: { name: "asc" } }),
     nextClientCode(),
   ]);
 

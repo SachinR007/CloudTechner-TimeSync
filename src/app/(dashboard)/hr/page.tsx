@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LateSubmissionsCard } from "./late-submissions-card";
 import { NotifyButton } from "./notify-button";
+import { employeeSafeSelect } from "@/lib/safe-selects";
 
 import {
   Table,
@@ -98,6 +99,7 @@ export default async function HrDashboard({
   const [loggers, weekHeaders, prevWeekHeaders, lateSubmissions] = await Promise.all([
     prisma.employee.findMany({
       where: { isActive: true, role: { in: ["EMPLOYEE", "PROJECT_MANAGER"] } },
+      select: employeeSafeSelect,
       orderBy: { name: "asc" },
     }),
     prisma.timesheetHeader.findMany({
@@ -113,7 +115,7 @@ export default async function HrDashboard({
         status: "SUBMITTED",
       },
       include: {
-        employee: true,
+        employee: { select: employeeSafeSelect },
       },
       orderBy: {
         submittedAt: "desc",
