@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
-import { formString, parseISODateValue, requireString, validateBoolean, validateRecordId } from "@/lib/validation";
+import { formString, parseISODateValue, requireString, validateBoolean, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 
 export async function createTask(projectId: string, formData: FormData) {
   await requireRole("TS_ADMIN");
   const safeProjectId = validateRecordId(projectId, "Project");
-  const name = requireString(formData, "name", "Task name", { max: 160 });
+  const name = validateSafeDisplayText(requireString(formData, "name", "Task name", { max: 160 }), "Task name", 160);
 
   const startDate = parseISODateValue(formString(formData, "startDate", { max: 10 }), "Start date");
   const endDate = parseISODateValue(formString(formData, "endDate", { max: 10 }), "End date");
@@ -28,7 +28,7 @@ export async function createTask(projectId: string, formData: FormData) {
 export async function updateTask(id: string, formData: FormData) {
   await requireRole("TS_ADMIN");
   const taskId = validateRecordId(id, "Task");
-  const name = requireString(formData, "name", "Task name", { max: 160 });
+  const name = validateSafeDisplayText(requireString(formData, "name", "Task name", { max: 160 }), "Task name", 160);
 
   const startDate = parseISODateValue(formString(formData, "startDate", { max: 10 }), "Start date");
   const endDate = parseISODateValue(formString(formData, "endDate", { max: 10 }), "End date");

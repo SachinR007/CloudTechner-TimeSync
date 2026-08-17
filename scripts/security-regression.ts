@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { validateSafeDisplayText } from "../src/lib/validation";
 
 const prisma = new PrismaClient();
 const baseUrl = process.env.SECURITY_TEST_BASE_URL ?? "http://127.0.0.1:3111";
@@ -199,6 +200,15 @@ async function login(email: string) {
 }
 
 async function runChecks() {
+  for (const payload of ["<h1>Test</h1>", "%3cscript%3ealert(1)%3c/script%3e", "<a href=\"https://evil.com\">click</a>", "javascript:alert(1)"]) {
+    try {
+      validateSafeDisplayText(payload, "Payload", 1000);
+      throw new Error(`Unsafe display text was accepted: ${payload}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Unsafe display text")) throw error;
+    }
+  }
+
   const employee = await login("sec.employee@example.com");
   const admin = await login("sec.admin@example.com");
 

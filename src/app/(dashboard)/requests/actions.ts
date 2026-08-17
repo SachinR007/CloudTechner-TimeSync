@@ -3,17 +3,32 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
-import { parseISODateValue, validateBoundedText, validateRecordId } from "@/lib/validation";
+import { parseISODateValue, validateBoundedText, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 import { isValidAllocationPercentage } from "@/lib/allocation";
+import { writeAuditLog } from "@/lib/audit";
+import { assertRateLimit } from "@/lib/rate-limit";
 
 export async function submitAllocationRequest(
   message: string
 ) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
-  const safeMessage = message.trim() ? validateBoundedText(message, "Message", 1000) : null;
+  assertRateLimit(`allocation-request:${user.id}`, {
+    limit: 3,
+    windowMs: 10 * 60 * 1000,
+    label: "Allocation request",
+  });
+  const safeMessage = message.trim() ? validateSafeDisplayText(message, "Message", 1000) : null;
+
+  const existingPending = await prisma.allocationRequest.findFirst({
+    where: { employeeId: user.id, status: "PENDING" },
+    select: { id: true, createdAt: true },
+  });
+  if (existingPending) {
+    throw new Error("You already have a pending allocation request. Please wait for admin review before submitting another.");
+  }
 
   // Create allocation request
-  await prisma.allocationRequest.create({
+  const request = await prisma.allocationRequest.create({
     data: {
       employeeId: user.id,
       projectId: null,
@@ -21,6 +36,14 @@ export async function submitAllocationRequest(
       message: safeMessage,
       status: "PENDING",
     },
+  });
+  await writeAuditLog({
+    actor: user,
+    action: "ALLOCATION_REQUEST_SUBMITTED",
+    entity: "AllocationRequest",
+    entityId: request.id,
+    summary: `${user.name ?? user.id} submitted an allocation request.`,
+    metadata: { message: safeMessage },
   });
 
   revalidatePath("/requests");
@@ -34,6 +57,11 @@ export async function approveAllocationRequest(
   allocationPercentage: number
 ) {
   const user = await requireRole("TS_ADMIN", "HR_ADMIN");
+  assertRateLimit(`allocation-approve:${user.id}`, {
+    limit: 30,
+    windowMs: 10 * 60 * 1000,
+    label: "Allocation approval",
+  });
   const safeRequestId = validateRecordId(requestId, "Allocation request");
   const safeProjectId = validateRecordId(projectId, "Project");
   const startDate = parseISODateValue(startDateStr, "Start date");
@@ -96,6 +124,20 @@ export async function approveAllocationRequest(
       },
     }),
   ]);
+  await writeAuditLog({
+    actor: user,
+    action: "ALLOCATION_REQUEST_APPROVED",
+    entity: "AllocationRequest",
+    entityId: safeRequestId,
+    summary: `${user.name ?? user.id} approved allocation request for ${request.employee.name}.`,
+    metadata: {
+      employeeId: request.employeeId,
+      projectId: safeProjectId,
+      allocationPercentage,
+      startDate: startDateStr,
+      endDate: endDateStr,
+    },
+  });
 
   revalidatePath("/requests");
   revalidatePath("/employee");
@@ -103,6 +145,11 @@ export async function approveAllocationRequest(
 
 export async function rejectAllocationRequest(requestId: string, comment?: string) {
   const user = await requireRole("TS_ADMIN", "HR_ADMIN");
+  assertRateLimit(`allocation-reject:${user.id}`, {
+    limit: 30,
+    windowMs: 10 * 60 * 1000,
+    label: "Allocation rejection",
+  });
   const safeRequestId = validateRecordId(requestId, "Allocation request");
   const safeComment = comment?.trim() ? validateBoundedText(comment, "Comment", 1000) : null;
 
@@ -134,6 +181,14 @@ export async function rejectAllocationRequest(requestId: string, comment?: strin
       },
     }),
   ]);
+  await writeAuditLog({
+    actor: user,
+    action: "ALLOCATION_REQUEST_REJECTED",
+    entity: "AllocationRequest",
+    entityId: safeRequestId,
+    summary: `${user.name ?? user.id} rejected allocation request ${safeRequestId}.`,
+    metadata: { employeeId: request.employeeId, comment: safeComment },
+  });
 
   revalidatePath("/requests");
 }

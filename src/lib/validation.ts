@@ -84,3 +84,11 @@ export function validateBoundedText(value: string, label: string, max = 1000) {
   if (trimmed.length > max) throw new Error(`${label} is too long.`);
   return trimmed;
 }
+
+export function validateSafeDisplayText(value: string, label: string, max = 1000) {
+  const trimmed = validateBoundedText(value, label, max);
+  if (/[<>]/.test(trimmed) || /%(?:3c|3e)/i.test(trimmed) || /javascript:/i.test(trimmed) || /script/i.test(trimmed)) {
+    throw new Error(`${label} cannot contain HTML, script, or links.`);
+  }
+  return trimmed;
+}

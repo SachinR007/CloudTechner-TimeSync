@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
-import { parseISODateValue, validateBoundedText, validateRecordId } from "@/lib/validation";
+import { parseISODateValue, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 
 export async function approveLateSubmission(timesheetHeaderId: string) {
   const user = await requireRole("HR_ADMIN");
@@ -55,7 +55,7 @@ export async function rejectLateSubmission(timesheetHeaderId: string, comments: 
   const user = await requireRole("HR_ADMIN");
   const safeHeaderId = validateRecordId(timesheetHeaderId, "Timesheet");
   const safeComments = comments.trim()
-    ? validateBoundedText(comments, "Rejection comments", 1000)
+    ? validateSafeDisplayText(comments, "Rejection comments", 1000)
     : "Late submission rejected by HR Admin.";
 
   await prisma.$transaction(async (tx) => {

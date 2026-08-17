@@ -376,3 +376,19 @@ model Notification {
 
   @@index([employeeId])
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actorName String?
+  action    String
+  entity    String
+  entityId  String?
+  summary   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

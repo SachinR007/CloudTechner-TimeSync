@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import { addDays, mondayOf, toISODate } from "@/lib/dates";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
-import { parseISODateValue, validateRecordId } from "@/lib/validation";
+import { parseISODateValue, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 
 function parseLines(formData: FormData) {
   const lines: { taskId: string; workDate: string; hours: number; notes: string }[] = [];
@@ -22,7 +22,7 @@ function parseLines(formData: FormData) {
       }
       const notes = String(formData.get(`notes__${taskId}__${workDate}`) ?? "").trim();
       if (notes.length > 1000) throw new Error("Timesheet notes are too long.");
-      lines.push({ taskId: safeTaskId, workDate: toISODate(safeWorkDate), hours, notes });
+      lines.push({ taskId: safeTaskId, workDate: toISODate(safeWorkDate), hours, notes: notes ? validateSafeDisplayText(notes, "Timesheet notes", 1000) : "" });
     }
   }
   return lines;

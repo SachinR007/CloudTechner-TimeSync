@@ -14,7 +14,9 @@ import {
   validateEmail,
   validateEnum,
   validateRecordId,
+  validateSafeDisplayText,
 } from "@/lib/validation";
+import { writeAuditLog } from "@/lib/audit";
 
 const MIN_PASSWORD_LENGTH = 8;
 const EMPLOYEE_ROLE_VALUES = ["EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN"] as const;
@@ -29,7 +31,7 @@ function validatePassword(password: string) {
 }
 
 export async function createEmployee(formData: FormData) {
-  await requireRole("HR_ADMIN", "TS_ADMIN");
+  const actor = await requireRole("HR_ADMIN", "TS_ADMIN");
 
   const id = validateRecordId(requireString(formData, "id", "Employee ID", { max: 32 }), "Employee ID");
 
@@ -37,7 +39,7 @@ export async function createEmployee(formData: FormData) {
   const existingId = await prisma.employee.findUnique({ where: { id } });
   if (existingId) throw new Error(`Employee ID ${id} is already in use`);
 
-  const name = requireString(formData, "name", "Employee name", { max: 160 });
+  const name = validateSafeDisplayText(requireString(formData, "name", "Employee name", { max: 160 }), "Employee name", 160);
 
   const email = validateEmail(requireString(formData, "email", "Employee email", { max: 254 }));
 
@@ -75,24 +77,44 @@ export async function createEmployee(formData: FormData) {
       isActive: true,
     },
   });
+  await writeAuditLog({
+    actor,
+    action: "EMPLOYEE_CREATED",
+    entity: "Employee",
+    entityId: id,
+    summary: `${actor.name ?? actor.id} created employee ${name}.`,
+    metadata: { email, role, reportingManagerId, approverOverrideId },
+  });
 
   revalidatePath("/hr/employees");
 }
 
 export async function toggleEmployeeActive(id: string, isActive: boolean) {
-  await requireRole("HR_ADMIN", "TS_ADMIN");
+  const actor = await requireRole("HR_ADMIN", "TS_ADMIN");
   const employeeId = validateRecordId(id, "Employee");
   const active = validateBoolean(isActive, "Employee status");
 
   // Prevent HR admin from deactivating themselves
-  const sessionUser = await requireRole("HR_ADMIN", "TS_ADMIN");
-  if (sessionUser.id === employeeId && !active) {
+  if (actor.id === employeeId && !active) {
     throw new Error("You cannot deactivate your own profile.");
   }
+
+  const existing = await prisma.employee.findUniqueOrThrow({
+    where: { id: employeeId },
+    select: { name: true, isActive: true, role: true },
+  });
 
   await prisma.employee.update({
     where: { id: employeeId },
     data: { isActive: active },
+  });
+  await writeAuditLog({
+    actor,
+    action: active ? "EMPLOYEE_ACTIVATED" : "EMPLOYEE_DEACTIVATED",
+    entity: "Employee",
+    entityId: employeeId,
+    summary: `${actor.name ?? actor.id} changed ${existing.name} active status from ${existing.isActive} to ${active}.`,
+    metadata: { oldIsActive: existing.isActive, newIsActive: active, role: existing.role },
   });
 
   revalidatePath("/hr/employees");
@@ -109,10 +131,22 @@ export async function getEmployeeProjectHistory(employeeId: string): Promise<Pro
 }
 
 export async function updateEmployee(id: string, formData: FormData) {
-  await requireRole("HR_ADMIN", "TS_ADMIN");
+  const actor = await requireRole("HR_ADMIN", "TS_ADMIN");
   const employeeId = validateRecordId(id, "Employee");
+  const existing = await prisma.employee.findUniqueOrThrow({
+    where: { id: employeeId },
+    select: {
+      name: true,
+      role: true,
+      phone: true,
+      title: true,
+      reportingManagerId: true,
+      approverOverrideId: true,
+      isActive: true,
+    },
+  });
 
-  const name = requireString(formData, "name", "Employee name", { max: 160 });
+  const name = validateSafeDisplayText(requireString(formData, "name", "Employee name", { max: 160 }), "Employee name", 160);
 
   const role = validateEnum(formString(formData, "role"), EMPLOYEE_ROLE_VALUES, "EMPLOYEE", "Employee role") as EmployeeRole;
 
@@ -144,6 +178,25 @@ export async function updateEmployee(id: string, formData: FormData) {
   await prisma.employee.update({
     where: { id: employeeId },
     data: updateData,
+  });
+  await writeAuditLog({
+    actor,
+    action: "EMPLOYEE_UPDATED",
+    entity: "Employee",
+    entityId: employeeId,
+    summary: `${actor.name ?? actor.id} updated employee ${existing.name}.`,
+    metadata: {
+      old: existing,
+      new: {
+        name,
+        role,
+        phone,
+        title,
+        reportingManagerId,
+        approverOverrideId,
+        passwordChanged: Boolean(password && password.trim() !== ""),
+      },
+    },
   });
 
   revalidatePath("/hr/employees");

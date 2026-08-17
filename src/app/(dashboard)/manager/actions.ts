@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import type { Prisma } from "@prisma/client";
-import { validateBoundedText, validateRecordId } from "@/lib/validation";
+import { validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 
 // Recompute the parent week's status from its per-project approval slices:
 // REJECTED if any slice is rejected; APPROVED once every slice is approved;
@@ -66,7 +66,7 @@ export async function approveProjectApproval(approvalId: string) {
 export async function rejectProjectApproval(approvalId: string, comments: string) {
   const manager = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
   const safeApprovalId = validateRecordId(approvalId, "Approval");
-  const safeComments = validateBoundedText(comments, "Rejection comments", 1000);
+  const safeComments = validateSafeDisplayText(comments, "Rejection comments", 1000);
 
   const approval = await prisma.timesheetApproval.findUniqueOrThrow({
     where: { id: safeApprovalId },

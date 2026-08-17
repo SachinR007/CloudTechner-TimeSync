@@ -3,7 +3,7 @@
 import { requireRole } from "@/lib/auth-guards";
 import { assertSafeExcelFile, assertSafeSheetRows, assertSafeWorkbook } from "@/lib/excel-security";
 import { prisma } from "@/lib/prisma";
-import { parseISODateValue, validateBoolean, validateBoundedText, validateRecordId } from "@/lib/validation";
+import { parseISODateValue, validateBoolean, validateBoundedText, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import * as XLSX from "@e965/xlsx";
 
@@ -135,7 +135,7 @@ export async function addHolidayManual(
   await requireRole("TS_ADMIN", "HR_ADMIN");
 
   const safeHolidayPlanId = validateRecordId(holidayPlanId, "Holiday plan");
-  const safeName = validateBoundedText(name, "Holiday name", 160);
+  const safeName = validateSafeDisplayText(name, "Holiday name", 160);
   const safeDate = parseISODateValue(dateStr, "Holiday date");
   if (!safeDate) throw new Error("Holiday date is required.");
   const safeFloaterLeave = validateBoolean(isFloaterLeave, "Floater leave");
@@ -173,7 +173,7 @@ export async function deleteHoliday(id: string) {
 
 export async function createHolidayPlan(name: string) {
   await requireRole("TS_ADMIN", "HR_ADMIN");
-  const safeName = validateBoundedText(name, "Plan name", 120);
+  const safeName = validateSafeDisplayText(name, "Plan name", 120);
   
   const existing = await prisma.holidayPlan.findUnique({
     where: { name: safeName },

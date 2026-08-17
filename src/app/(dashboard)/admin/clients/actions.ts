@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
-import { formString, optionalRecordId, requireString, validateBoolean, validateRecordId } from "@/lib/validation";
+import { formString, optionalRecordId, requireString, validateBoolean, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function createClient(formData: FormData) {
-  await requireRole("TS_ADMIN");
+  const actor = await requireRole("TS_ADMIN");
 
-  const name = requireString(formData, "name", "Client name", { max: 160 });
+  const name = validateSafeDisplayText(requireString(formData, "name", "Client name", { max: 160 }), "Client name", 160);
 
   const code = formString(formData, "code", { max: 32 });
   if (code) {
@@ -18,7 +19,7 @@ export async function createClient(formData: FormData) {
 
   const sameAsClient = formData.get("billingSameAsClient") === "on";
 
-  await prisma.client.create({
+  const client = await prisma.client.create({
     data: {
       name,
       code,
@@ -35,12 +36,29 @@ export async function createClient(formData: FormData) {
       zip: formString(formData, "zip", { max: 24 }),
     },
   });
+  await writeAuditLog({
+    actor,
+    action: "CLIENT_CREATED",
+    entity: "Client",
+    entityId: client.id,
+    summary: `${actor.name ?? actor.id} created client ${name}.`,
+    metadata: { code, clientManagerId: client.clientManagerId },
+  });
 
   revalidatePath("/admin/clients");
 }
 
 export async function toggleClientActive(id: string, isActive: boolean) {
-  await requireRole("TS_ADMIN");
-  await prisma.client.update({ where: { id: validateRecordId(id, "Client") }, data: { isActive: validateBoolean(isActive, "Client status") } });
+  const actor = await requireRole("TS_ADMIN");
+  const clientId = validateRecordId(id, "Client");
+  const active = validateBoolean(isActive, "Client status");
+  const client = await prisma.client.update({ where: { id: clientId }, data: { isActive: active } });
+  await writeAuditLog({
+    actor,
+    action: active ? "CLIENT_ACTIVATED" : "CLIENT_DEACTIVATED",
+    entity: "Client",
+    entityId: clientId,
+    summary: `${actor.name ?? actor.id} changed client ${client.name} active status to ${active}.`,
+  });
   revalidatePath("/admin/clients");
 }
