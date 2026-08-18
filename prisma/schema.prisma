@@ -61,6 +61,7 @@ model Employee {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  authSessionVersion Int @default(0)
 
   timesheetApprovals TimesheetApproval[] @relation("TimesheetApprover")
   allocations        ProjectAllocation[] @relation("EmployeeAllocations")

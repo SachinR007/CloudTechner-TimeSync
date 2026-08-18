@@ -18,7 +18,7 @@ async function findActiveEmployeeByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true, updatedAt: true },
+    select: { id: true, name: true, email: true, role: true, updatedAt: true, authSessionVersion: true },
   });
 }
 
@@ -28,20 +28,32 @@ async function findActiveEmployeeCredentialsByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true, passwordHash: true, updatedAt: true },
+    select: { id: true, name: true, email: true, role: true, passwordHash: true, updatedAt: true, authSessionVersion: true },
   });
+}
+
+function buildSessionVersion(employee: { authSessionVersion: number; updatedAt: Date }) {
+  return `${employee.authSessionVersion}:${employee.updatedAt.toISOString()}`;
 }
 
 async function validateSessionToken(employeeId?: string, sessionVersion?: string) {
   if (!employeeId || !sessionVersion) return null;
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
-    select: { id: true, role: true, isActive: true, updatedAt: true },
+    select: { id: true, role: true, isActive: true, updatedAt: true, authSessionVersion: true },
   });
   if (!employee?.isActive) return null;
-  const currentVersion = employee.updatedAt.toISOString();
+  const currentVersion = buildSessionVersion(employee);
   if (currentVersion !== sessionVersion) return null;
   return { role: employee.role, sessionVersion: currentVersion };
+}
+
+async function bumpLoginSession(employeeId: string) {
+  return prisma.employee.update({
+    where: { id: employeeId },
+    data: { authSessionVersion: { increment: 1 } },
+    select: { id: true, name: true, email: true, role: true, updatedAt: true, authSessionVersion: true },
+  });
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -81,12 +93,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               const valid = await bcrypt.compare(password, employee.passwordHash);
               if (!valid) return null;
 
+              const loginEmployee = await bumpLoginSession(employee.id);
+
               return {
                 id: employee.id,
-                name: employee.name,
-                email: employee.email,
-                role: employee.role,
-                sessionVersion: employee.updatedAt.toISOString(),
+                name: loginEmployee.name,
+                email: loginEmployee.email,
+                role: loginEmployee.role,
+                sessionVersion: buildSessionVersion(loginEmployee),
               };
             },
           }),
@@ -118,12 +132,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return "/login?error=not-authorized";
       }
 
-      user.id = employee.id;
-      user.name = employee.name;
-      user.email = employee.email;
-      user.role = employee.role;
-      user.sessionVersion = employee.updatedAt.toISOString();
-      console.info("SSO success.", { employeeId: employee.id, email: employee.email });
+      const loginEmployee = await bumpLoginSession(employee.id);
+      user.id = loginEmployee.id;
+      user.name = loginEmployee.name;
+      user.email = loginEmployee.email;
+      user.role = loginEmployee.role;
+      user.sessionVersion = buildSessionVersion(loginEmployee);
+      console.info("SSO success.", { employeeId: loginEmployee.id, email: loginEmployee.email });
       return true;
     },
     jwt: async ({ token, user }) => {

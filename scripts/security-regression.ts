@@ -209,8 +209,14 @@ async function runChecks() {
     }
   }
 
+  const oldEmployeeSession = await login("sec.employee@example.com");
   const employee = await login("sec.employee@example.com");
   const admin = await login("sec.admin@example.com");
+
+  const replacedSession = await request(oldEmployeeSession, "/employee");
+  if (![302, 303, 307, 401].includes(replacedSession.status)) {
+    throw new Error(`Concurrent-login invalidation check failed: ${replacedSession.status}`);
+  }
 
   const protectedPaths = ["/admin", "/admin/allocations", "/admin/projects", "/admin/clients", "/admin/projects/sec-project", "/hr/employees"];
   const employeeRows = [];
@@ -253,7 +259,7 @@ async function runChecks() {
     throw new Error(`Session revocation check failed: ${revokedSession.status}`);
   }
 
-  console.log(JSON.stringify({ employeeRows, adminRows, headers, revokedSession: { status: revokedSession.status } }, null, 2));
+  console.log(JSON.stringify({ employeeRows, adminRows, headers, replacedSession: { status: replacedSession.status }, revokedSession: { status: revokedSession.status } }, null, 2));
 }
 
 async function stopServer(child: ChildProcessWithoutNullStreams) {
