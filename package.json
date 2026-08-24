@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "security:regression": "tsx scripts/security-regression.ts",
+    "timesheet-access:regression": "tsx scripts/timesheet-access-regression.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts"
   },
