@@ -3,40 +3,74 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build and security checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: timesheet
-          POSTGRES_PASSWORD: timesheet
-          POSTGRES_DB: timesheet
+          POSTGRES_USER: timesheet_app
+          POSTGRES_PASSWORD: timesheet_ci_password
+          POSTGRES_DB: timesheet_ci
         ports:
-          - 5434:5432
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     env:
-      DATABASE_URL: postgresql://timesheet:timesheet@localhost:5434/timesheet
-      AUTH_SECRET: ci-build-secret-ci-build-secret-ci-build-secret
-      AUTH_TRUST_HOST: true
+      DATABASE_URL: postgresql://timesheet_app:timesheet_ci_password@127.0.0.1:5432/timesheet_ci
+      AUTH_SECRET: ci-only-auth-secret-ci-only-auth-secret-ci-only
+      AUTH_URL: http://127.0.0.1:3111
+      AUTH_TRUST_HOST: "true"
+      ENABLE_CREDENTIALS_LOGIN: "true"
+      SSO_ALLOWED_EMAIL_DOMAIN: "@cloudtechner.com"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           cache: npm
 
-      - run: npm ci
-      - run: npx prisma validate
-      - run: npx prisma migrate deploy
-      - run: npx tsc --noEmit
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Apply migrations to CI database
+        run: npx prisma migrate deploy
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Timesheet access regression
+        run: npm run timesheet-access:regression
+
+      - name: Security regression
+        run: npm run security:regression
+
+      - name: Dependency audit
+        run: npm audit --audit-level=moderate
