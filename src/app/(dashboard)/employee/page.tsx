@@ -1,25 +1,16 @@
 
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
 import { addDays, mondayOf, toISODate, weekDates } from "@/lib/dates";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TimesheetGrid } from "./timesheet-grid";
 import { withdrawTimesheet } from "./actions";
 import { WeekDatePicker } from "@/components/week-date-picker";
 import { EmployeeTabs } from "./employee-tabs";
-import { allocationStatusFor } from "@/lib/allocation";
 import { computeProjectHistory } from "@/lib/project-history";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
 import { employeeOptionSelect } from "@/lib/safe-selects";
@@ -38,17 +29,20 @@ export default async function EmployeeDashboard({
 }) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
   const { week } = await searchParams;
+  const employeeAccess = await prisma.employee.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { isActive: true, canSubmitTimesheet: true },
+  });
+  const canUseTimesheet = employeeAccess.isActive && employeeAccess.canSubmitTimesheet;
+  if (!canUseTimesheet) {
+    redirect("/not-enabled");
+  }
 
   const weekStart = mondayOf(week ? new Date(`${week}T00:00:00.000Z`) : new Date());
   const weekStartISO = toISODate(weekStart);
   const dates = weekDates(weekStart).map(toISODate);
   const prevWeek = toISODate(addDays(weekStart, -7));
   const nextWeek = toISODate(addDays(weekStart, 7));
-  const employeeAccess = await prisma.employee.findUniqueOrThrow({
-    where: { id: user.id },
-    select: { isActive: true, canSubmitTimesheet: true },
-  });
-  const canUseTimesheet = employeeAccess.isActive && employeeAccess.canSubmitTimesheet;
 
   const weekEnd = addDays(weekStart, 6);
   const allocations = await prisma.projectAllocation.findMany({

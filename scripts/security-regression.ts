@@ -6,7 +6,7 @@ import { validateSafeDisplayText } from "../src/lib/validation";
 const prisma = new PrismaClient();
 const baseUrl = process.env.SECURITY_TEST_BASE_URL ?? "http://127.0.0.1:3111";
 const port = new URL(baseUrl).port || "3111";
-const testIds = ["SECADM", "SECMGR", "SECEMP", "SECHASH"];
+const testIds = ["SECADM", "SECMGR", "SECEMP", "SECDIS", "SECHASH"];
 
 class CookieJar {
   private cookies = new Map<string, string>();
@@ -95,7 +95,7 @@ async function seed() {
   const passwordHash = await bcrypt.hash("SecurityTest123", 10);
   await prisma.employee.createMany({
     data: [
-      { id: "SECADM", name: "Security Test Admin", email: "sec.admin@example.com", role: "TS_ADMIN", passwordHash, isActive: true },
+      { id: "SECADM", name: "Security Test Admin", email: "sec.admin@example.com", role: "TS_ADMIN", passwordHash, isActive: true, canSubmitTimesheet: true },
       {
         id: "SECMGR",
         name: "Security Test Manager",
@@ -103,6 +103,7 @@ async function seed() {
         role: "PROJECT_MANAGER",
         passwordHash,
         isActive: true,
+        canSubmitTimesheet: true,
         reportingManagerId: "SECADM",
       },
       {
@@ -112,6 +113,17 @@ async function seed() {
         role: "EMPLOYEE",
         passwordHash,
         isActive: true,
+        canSubmitTimesheet: true,
+        reportingManagerId: "SECMGR",
+      },
+      {
+        id: "SECDIS",
+        name: "Disabled Access Test Employee",
+        email: "sec.disabled@example.com",
+        role: "EMPLOYEE",
+        passwordHash,
+        isActive: true,
+        canSubmitTimesheet: false,
         reportingManagerId: "SECMGR",
       },
       {
@@ -121,6 +133,7 @@ async function seed() {
         role: "EMPLOYEE",
         passwordHash,
         isActive: true,
+        canSubmitTimesheet: true,
         reportingManagerId: "SECMGR",
       },
     ],
@@ -211,6 +224,7 @@ async function runChecks() {
 
   const oldEmployeeSession = await login("sec.employee@example.com");
   const employee = await login("sec.employee@example.com");
+  const disabledEmployee = await login("sec.disabled@example.com");
   const admin = await login("sec.admin@example.com");
 
   const replacedSession = await request(oldEmployeeSession, "/employee");
@@ -227,6 +241,36 @@ async function runChecks() {
     if (response.status !== 403 || result.hasHash || result.hasPasswordHashField || result.hasMarker) {
       throw new Error(`Employee access check failed: ${JSON.stringify(result)}`);
     }
+  }
+
+  const disabledEmployeeRows = [];
+  for (const path of ["/employee", "/employee?week=2026-08-10", "/requests"]) {
+    const response = await request(disabledEmployee, path);
+    const result = { as: "DISABLED_EMPLOYEE", path, status: response.status, location: response.location, ...scan(response.text) };
+    disabledEmployeeRows.push(result);
+    if (![302, 303, 307, 308].includes(response.status) || !response.location.includes("/not-enabled") || result.hasHash || result.hasPasswordHashField || result.hasMarker) {
+      throw new Error(`Disabled employee route gate failed: ${JSON.stringify(result)}`);
+    }
+  }
+
+  const disabledPost = await request(disabledEmployee, "/requests", { method: "POST", body: "tamper=true" });
+  const disabledPostResult = { as: "DISABLED_EMPLOYEE", path: "/requests", method: "POST", status: disabledPost.status, ...scan(disabledPost.text) };
+  if (disabledPost.status !== 403 || disabledPostResult.hasHash || disabledPostResult.hasPasswordHashField || disabledPostResult.hasMarker) {
+    throw new Error(`Disabled employee POST gate failed: ${JSON.stringify(disabledPostResult)}`);
+  }
+
+  const disabledNotice = await request(disabledEmployee, "/not-enabled");
+  const disabledNoticeResult = { as: "DISABLED_EMPLOYEE", path: "/not-enabled", status: disabledNotice.status, ...scan(disabledNotice.text) };
+  if (
+    disabledNotice.status !== 200 ||
+    !disabledNotice.text.includes("Timesheet not enabled for you yet") ||
+    disabledNotice.text.includes("Admin dashboard") ||
+    disabledNotice.text.includes("Allocation Requests") ||
+    disabledNoticeResult.hasHash ||
+    disabledNoticeResult.hasPasswordHashField ||
+    disabledNoticeResult.hasMarker
+  ) {
+    throw new Error(`Disabled employee notice page leaked dashboard data: ${JSON.stringify(disabledNoticeResult)}`);
   }
 
   const adminRows = [];
@@ -259,7 +303,7 @@ async function runChecks() {
     throw new Error(`Session revocation check failed: ${revokedSession.status}`);
   }
 
-  console.log(JSON.stringify({ employeeRows, adminRows, headers, replacedSession: { status: replacedSession.status }, revokedSession: { status: revokedSession.status } }, null, 2));
+  console.log(JSON.stringify({ employeeRows, disabledEmployeeRows, disabledPostResult, disabledNoticeResult, adminRows, headers, replacedSession: { status: replacedSession.status }, revokedSession: { status: revokedSession.status } }, null, 2));
 }
 
 async function stopServer(child: ChildProcessWithoutNullStreams) {

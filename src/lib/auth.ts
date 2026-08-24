@@ -18,7 +18,7 @@ async function findActiveEmployeeByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true, updatedAt: true, authSessionVersion: true },
+    select: { id: true, name: true, email: true, role: true, canSubmitTimesheet: true, updatedAt: true, authSessionVersion: true },
   });
 }
 
@@ -28,7 +28,7 @@ async function findActiveEmployeeCredentialsByEmail(email: string) {
       email: { equals: email, mode: "insensitive" },
       isActive: true,
     },
-    select: { id: true, name: true, email: true, role: true, passwordHash: true, updatedAt: true, authSessionVersion: true },
+    select: { id: true, name: true, email: true, role: true, canSubmitTimesheet: true, passwordHash: true, updatedAt: true, authSessionVersion: true },
   });
 }
 
@@ -40,19 +40,19 @@ async function validateSessionToken(employeeId?: string, sessionVersion?: string
   if (!employeeId || !sessionVersion) return null;
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
-    select: { id: true, role: true, isActive: true, updatedAt: true, authSessionVersion: true },
+    select: { id: true, role: true, canSubmitTimesheet: true, isActive: true, updatedAt: true, authSessionVersion: true },
   });
   if (!employee?.isActive) return null;
   const currentVersion = buildSessionVersion(employee);
   if (currentVersion !== sessionVersion) return null;
-  return { role: employee.role, sessionVersion: currentVersion };
+  return { role: employee.role, canSubmitTimesheet: employee.canSubmitTimesheet, sessionVersion: currentVersion };
 }
 
 async function bumpLoginSession(employeeId: string) {
   return prisma.employee.update({
     where: { id: employeeId },
     data: { authSessionVersion: { increment: 1 } },
-    select: { id: true, name: true, email: true, role: true, updatedAt: true, authSessionVersion: true },
+    select: { id: true, name: true, email: true, role: true, canSubmitTimesheet: true, updatedAt: true, authSessionVersion: true },
   });
 }
 
@@ -100,6 +100,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 name: loginEmployee.name,
                 email: loginEmployee.email,
                 role: loginEmployee.role,
+                canSubmitTimesheet: loginEmployee.canSubmitTimesheet,
                 sessionVersion: buildSessionVersion(loginEmployee),
               };
             },
@@ -137,6 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       user.name = loginEmployee.name;
       user.email = loginEmployee.email;
       user.role = loginEmployee.role;
+      user.canSubmitTimesheet = loginEmployee.canSubmitTimesheet;
       user.sessionVersion = buildSessionVersion(loginEmployee);
       console.info("SSO success.", { employeeId: loginEmployee.id, email: loginEmployee.email });
       return true;
@@ -145,6 +147,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.employeeId = user.id;
         token.role = (user as { role: Role }).role;
+        token.canSubmitTimesheet = (user as { canSubmitTimesheet?: boolean }).canSubmitTimesheet;
         token.sessionVersion = (user as { sessionVersion?: string }).sessionVersion;
         return token;
       }
@@ -154,6 +157,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return null;
       }
       token.role = current.role;
+      token.canSubmitTimesheet = current.canSubmitTimesheet;
       token.sessionVersion = current.sessionVersion;
       return token;
     },
@@ -161,6 +165,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.employeeId as string;
         session.user.role = token.role as Role;
+        session.user.canSubmitTimesheet = token.canSubmitTimesheet as boolean;
       }
       return session;
     },

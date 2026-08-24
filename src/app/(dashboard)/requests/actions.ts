@@ -7,11 +7,15 @@ import { parseISODateValue, validateBoundedText, validateRecordId, validateSafeD
 import { isValidAllocationPercentage } from "@/lib/allocation";
 import { writeAuditLog } from "@/lib/audit";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { assertTimesheetAccess } from "@/lib/timesheet-access";
 
 export async function submitAllocationRequest(
   message: string
 ) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  if (user.role !== "TS_ADMIN" && user.role !== "HR_ADMIN") {
+    await assertTimesheetAccess(user.id);
+  }
   assertRateLimit(`allocation-request:${user.id}`, {
     limit: 3,
     windowMs: 10 * 60 * 1000,
@@ -195,6 +199,9 @@ export async function rejectAllocationRequest(requestId: string, comment?: strin
 
 export async function dismissNotification(notificationId: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  if (user.role !== "TS_ADMIN" && user.role !== "HR_ADMIN") {
+    await assertTimesheetAccess(user.id);
+  }
 
   await prisma.notification.updateMany({
     where: { id: validateRecordId(notificationId, "Notification"), employeeId: user.id },
@@ -207,6 +214,9 @@ export async function dismissNotification(notificationId: string) {
 
 export async function dismissAllNotifications() {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  if (user.role !== "TS_ADMIN" && user.role !== "HR_ADMIN") {
+    await assertTimesheetAccess(user.id);
+  }
 
   await prisma.notification.updateMany({
     where: { employeeId: user.id, isRead: false },

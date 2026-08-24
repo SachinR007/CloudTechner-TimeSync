@@ -390,6 +390,7 @@ export async function withdrawTimesheet(weekStartISO: string) {
 
 export async function dismissNotification(notificationId: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  await assertTimesheetAccess(user.id);
 
   await prisma.notification.update({
     where: { id: validateRecordId(notificationId, "Notification"), employeeId: user.id },

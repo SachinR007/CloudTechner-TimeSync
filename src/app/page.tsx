@@ -7,5 +7,8 @@ export default async function Home() {
   if (!session?.user) {
     redirect("/login");
   }
+  if (session.user.role === "EMPLOYEE" && !session.user.canSubmitTimesheet) {
+    redirect("/not-enabled");
+  }
   redirect(dashboardPathForRole(session.user.role));
 }
