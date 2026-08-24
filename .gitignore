@@ -22,13 +22,20 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+*.key
+*.p12
+*.pfx
+*.crt
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+*.stackdump
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -45,3 +52,17 @@ next-env.d.ts
 *.xlsx
 scripts/import-roster.sql
 scripts/import-report.txt
+
+# local/private tooling and runtime artifacts
+.claude/
+.agents/
+.npm-cache/
+.pm2/
+outputs/
+backups/
+*.dump
+*.backup
+*.bak
+*.sql
+!prisma/migrations/**/migration.sql
+!scripts/import-timesheets.sql
