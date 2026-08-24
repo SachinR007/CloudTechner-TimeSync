@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { assertTimesheetAccess } from "../src/lib/timesheet-access";
 
 const prisma = new PrismaClient();
 
@@ -25,11 +26,19 @@ async function main() {
     select: { id: true, canSubmitTimesheet: true },
   });
 
+  let disabledGuardMessage = "";
+  try {
+    await assertTimesheetAccess(id);
+  } catch (error) {
+    disabledGuardMessage = error instanceof Error ? error.message : String(error);
+  }
+
   await prisma.employee.update({ where: { id }, data: { canSubmitTimesheet: true } });
   const enabled = await prisma.employee.findUniqueOrThrow({
     where: { id },
     select: { canSubmitTimesheet: true },
   });
+  await assertTimesheetAccess(id);
 
   await prisma.employee.update({ where: { id }, data: { canSubmitTimesheet: false } });
   const disabled = await prisma.employee.findUniqueOrThrow({
@@ -37,14 +46,24 @@ async function main() {
     select: { canSubmitTimesheet: true },
   });
 
+  let inactiveGuardMessage = "";
+  await prisma.employee.update({ where: { id }, data: { isActive: false, canSubmitTimesheet: true } });
+  try {
+    await assertTimesheetAccess(id);
+  } catch (error) {
+    inactiveGuardMessage = error instanceof Error ? error.message : String(error);
+  }
+
   await prisma.employee.delete({ where: { id } });
   const leftover = await prisma.employee.count({ where: { OR: [{ id }, { email }] } });
 
   const result = {
     countsBefore,
     newEmployeeDefaultIsDisabled: created.canSubmitTimesheet === false,
+    disabledEmployeeIsBlocked: disabledGuardMessage === "Timesheet access is not enabled for your profile. Contact HR.",
     enableToggleWorks: enabled.canSubmitTimesheet === true,
     disableToggleWorks: disabled.canSubmitTimesheet === false,
+    inactiveEmployeeIsBlocked: inactiveGuardMessage === "Your employee profile is inactive. Contact HR.",
     tempDataCleanedUp: leftover === 0,
   };
 

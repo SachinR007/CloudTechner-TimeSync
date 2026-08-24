@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import { addDays, mondayOf, toISODate } from "@/lib/dates";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
+import { assertTimesheetAccess } from "@/lib/timesheet-access";
 import { parseISODateValue, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 
 function parseLines(formData: FormData) {
@@ -26,21 +27,6 @@ function parseLines(formData: FormData) {
     }
   }
   return lines;
-}
-
-async function assertTimesheetAccess(employeeId: string) {
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-    select: { isActive: true, canSubmitTimesheet: true },
-  });
-
-  if (!employee?.isActive) {
-    throw new Error("Your employee profile is inactive. Contact HR.");
-  }
-
-  if (!employee.canSubmitTimesheet) {
-    throw new Error("Timesheet access is not enabled for your profile. Contact HR.");
-  }
 }
 
 async function upsertTimesheet(
