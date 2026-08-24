@@ -44,6 +44,11 @@ export default async function EmployeeDashboard({
   const dates = weekDates(weekStart).map(toISODate);
   const prevWeek = toISODate(addDays(weekStart, -7));
   const nextWeek = toISODate(addDays(weekStart, 7));
+  const employeeAccess = await prisma.employee.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { isActive: true, canSubmitTimesheet: true },
+  });
+  const canUseTimesheet = employeeAccess.isActive && employeeAccess.canSubmitTimesheet;
 
   const weekEnd = addDays(weekStart, 6);
   const allocations = await prisma.projectAllocation.findMany({
@@ -163,7 +168,7 @@ export default async function EmployeeDashboard({
     initialNotes[`${line.taskId}__${toISODate(line.workDate)}`] = line.notes ?? "";
   }
 
-  const editable = !header || header.status === "DRAFT" || header.status === "REJECTED";
+  const editable = canUseTimesheet && (!header || header.status === "DRAFT" || header.status === "REJECTED");
 
   const recentTimesheets = await prisma.timesheetHeader.findMany({
     where: { employeeId: user.id },
@@ -380,7 +385,6 @@ export default async function EmployeeDashboard({
   const empDetails = await prisma.employee.findUnique({
     where: { id: user.id },
     select: {
-      isActive: true,
       approverOverrideId: true,
       reportingManagerId: true,
       reportingManager: { select: { name: true } },
@@ -458,6 +462,7 @@ export default async function EmployeeDashboard({
         initialHours={initialHours}
         initialNotes={initialNotes}
         editable={editable}
+        canUseTimesheet={canUseTimesheet}
         loggedThisWeek={loggedThisWeek}
         pendingApprovalCount={pendingApprovalCount}
         approvedMTD={approvedMTD}

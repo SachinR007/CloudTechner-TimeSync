@@ -56,6 +56,7 @@ export async function createEmployee(formData: FormData) {
     throw new Error("Reporting Manager is required");
   }
   const approverOverrideId = optionalRecordId(formString(formData, "approverOverrideId"), "Approver override");
+  const canSubmitTimesheet = formData.get("canSubmitTimesheet") === "on";
   const password = formString(formData, "password", { max: 128 });
   if (!password) throw new Error("Login password is required.");
   validatePassword(password);
@@ -75,6 +76,7 @@ export async function createEmployee(formData: FormData) {
       approverOverrideId,
       passwordHash,
       isActive: true,
+      canSubmitTimesheet,
     },
   });
   await writeAuditLog({
@@ -83,7 +85,7 @@ export async function createEmployee(formData: FormData) {
     entity: "Employee",
     entityId: id,
     summary: `${actor.name ?? actor.id} created employee ${name}.`,
-    metadata: { email, role, reportingManagerId, approverOverrideId },
+    metadata: { email, role, reportingManagerId, approverOverrideId, canSubmitTimesheet },
   });
 
   revalidatePath("/hr/employees");
@@ -120,6 +122,34 @@ export async function toggleEmployeeActive(id: string, isActive: boolean) {
   revalidatePath("/hr/employees");
 }
 
+export async function toggleEmployeeTimesheetAccess(id: string, canSubmitTimesheet: boolean) {
+  const actor = await requireRole("HR_ADMIN", "TS_ADMIN");
+  const employeeId = validateRecordId(id, "Employee");
+  const access = validateBoolean(canSubmitTimesheet, "Timesheet access");
+
+  const existing = await prisma.employee.findUniqueOrThrow({
+    where: { id: employeeId },
+    select: { name: true, role: true, canSubmitTimesheet: true },
+  });
+
+  await prisma.employee.update({
+    where: { id: employeeId },
+    data: { canSubmitTimesheet: access },
+  });
+
+  await writeAuditLog({
+    actor,
+    action: access ? "TIMESHEET_ACCESS_ENABLED" : "TIMESHEET_ACCESS_DISABLED",
+    entity: "Employee",
+    entityId: employeeId,
+    summary: `${actor.name ?? actor.id} changed ${existing.name} timesheet access from ${existing.canSubmitTimesheet} to ${access}.`,
+    metadata: { oldCanSubmitTimesheet: existing.canSubmitTimesheet, newCanSubmitTimesheet: access, role: existing.role },
+  });
+
+  revalidatePath("/hr/employees");
+  revalidatePath("/employee");
+}
+
 // Project history for the HR Employees dialog -- computed from actual timesheet
 // entries (contiguous stints), same source as the employee's own Project History
 // tab. See src/lib/project-history.ts.
@@ -143,6 +173,7 @@ export async function updateEmployee(id: string, formData: FormData) {
       reportingManagerId: true,
       approverOverrideId: true,
       isActive: true,
+      canSubmitTimesheet: true,
     },
   });
 
@@ -159,6 +190,7 @@ export async function updateEmployee(id: string, formData: FormData) {
   }
 
   const approverOverrideId = optionalRecordId(formString(formData, "approverOverrideId"), "Approver override");
+  const canSubmitTimesheet = formData.get("canSubmitTimesheet") === "on";
   const password = formString(formData, "password", { max: 128 });
 
   const updateData: any = {
@@ -168,6 +200,7 @@ export async function updateEmployee(id: string, formData: FormData) {
     title,
     reportingManagerId,
     approverOverrideId,
+    canSubmitTimesheet,
   };
 
   if (password && password.trim() !== "") {
@@ -194,6 +227,7 @@ export async function updateEmployee(id: string, formData: FormData) {
         title,
         reportingManagerId,
         approverOverrideId,
+        canSubmitTimesheet,
         passwordChanged: Boolean(password && password.trim() !== ""),
       },
     },

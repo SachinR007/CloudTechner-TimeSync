@@ -58,10 +58,11 @@ model Employee {
   approverOverride   Employee?  @relation("ApproverOverride", fields: [approverOverrideId], references: [id])
   overrideFor        Employee[] @relation("ApproverOverride")
 
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  authSessionVersion Int @default(0)
+  isActive            Boolean  @default(true)
+  canSubmitTimesheet  Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  authSessionVersion  Int      @default(0)
 
   timesheetApprovals TimesheetApproval[] @relation("TimesheetApprover")
   allocations        ProjectAllocation[] @relation("EmployeeAllocations")

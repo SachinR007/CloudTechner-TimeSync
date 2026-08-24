@@ -43,6 +43,7 @@ export function EmployeeTabs({
   initialHours,
   initialNotes,
   editable,
+  canUseTimesheet,
   loggedThisWeek,
   pendingApprovalCount,
   approvedMTD,
@@ -71,6 +72,7 @@ export function EmployeeTabs({
   initialHours: Record<string, number>;
   initialNotes: Record<string, string>;
   editable: boolean;
+  canUseTimesheet: boolean;
   loggedThisWeek: number;
   pendingApprovalCount: number;
   approvedMTD: number;
@@ -132,6 +134,15 @@ export function EmployeeTabs({
       </div>
 
       {feedbackAlert}
+
+      {!canUseTimesheet && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="pt-4 text-sm text-amber-900">
+            <span className="font-semibold">Timesheet access is disabled. </span>
+            Contact HR to enable save and submit actions for your profile.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notifications from Allocation/Requests */}
       {notifications.length > 0 && (

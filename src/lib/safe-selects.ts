@@ -8,6 +8,7 @@ export const employeeSafeSelect = {
   reportingManagerId: true,
   approverOverrideId: true,
   isActive: true,
+  canSubmitTimesheet: true,
   createdAt: true,
   updatedAt: true,
 } as const;

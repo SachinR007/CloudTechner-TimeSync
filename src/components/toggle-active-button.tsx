@@ -7,10 +7,14 @@ export function ToggleActiveButton({
   id,
   isActive,
   action,
+  activeLabel = "Deactivate",
+  inactiveLabel = "Activate",
 }: {
   id: string;
   isActive: boolean;
   action: (id: string, isActive: boolean) => Promise<void>;
+  activeLabel?: string;
+  inactiveLabel?: string;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -21,7 +25,7 @@ export function ToggleActiveButton({
       disabled={isPending}
       onClick={() => startTransition(() => action(id, !isActive))}
     >
-      {isActive ? "Deactivate" : "Activate"}
+      {isActive ? activeLabel : inactiveLabel}
     </Button>
   );
 }

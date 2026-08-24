@@ -153,6 +153,10 @@ async function main() {
     },
   });
 
+  await prisma.employee.updateMany({
+    data: { canSubmitTimesheet: true },
+  });
+
   // ── Clients / Projects / Tasks ──
   const acme = await prisma.client.create({
     data: {

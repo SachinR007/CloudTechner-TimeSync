@@ -28,12 +28,29 @@ function parseLines(formData: FormData) {
   return lines;
 }
 
+async function assertTimesheetAccess(employeeId: string) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { isActive: true, canSubmitTimesheet: true },
+  });
+
+  if (!employee?.isActive) {
+    throw new Error("Your employee profile is inactive. Contact HR.");
+  }
+
+  if (!employee.canSubmitTimesheet) {
+    throw new Error("Timesheet access is not enabled for your profile. Contact HR.");
+  }
+}
+
 async function upsertTimesheet(
   employeeId: string,
   weekStartISO: string,
   formData: FormData,
   targetStatus: "DRAFT" | "SUBMITTED"
 ) {
+  await assertTimesheetAccess(employeeId);
+
   const parsedWeekStart = parseISODateValue(weekStartISO, "Week start date");
   if (!parsedWeekStart) throw new Error("Week start date is required.");
   const weekStartDate = mondayOf(parsedWeekStart);
@@ -352,6 +369,8 @@ export async function submitTimesheet(weekStartISO: string, formData: FormData) 
 
 export async function withdrawTimesheet(weekStartISO: string) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  await assertTimesheetAccess(user.id);
+
   const parsedWeekStart = parseISODateValue(weekStartISO, "Week start date");
   if (!parsedWeekStart) throw new Error("Week start date is required.");
   const weekStartDate = mondayOf(parsedWeekStart);

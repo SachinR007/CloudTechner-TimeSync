@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditEmployeeDialog } from "./edit-employee-dialog";
 import { EmployeeHistoryDialog } from "./employee-history-dialog";
 import { ToggleActiveButton } from "@/components/toggle-active-button";
-import { toggleEmployeeActive } from "./actions";
+import { toggleEmployeeActive, toggleEmployeeTimesheetAccess } from "./actions";
 
 type EmployeeItem = {
   id: string;
@@ -16,6 +16,7 @@ type EmployeeItem = {
   role: string;
   title: string | null;
   isActive: boolean;
+  canSubmitTimesheet: boolean;
   reportingManager: { id: string; name: string } | null;
   reportingManagerId: string | null;
   approverOverrideId: string | null;
@@ -171,19 +172,36 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
                     >
                       {initials}
                     </div>
-                    <div className="flex flex-col min-w-0">
+                  <div className="flex flex-col min-w-0">
                       <h3 className="text-sm font-bold text-gray-800 truncate leading-snug">
                         {emp.name}
                       </h3>
                       <p className="text-[10px] text-emerald-800 font-bold truncate mt-0.5 uppercase tracking-wider">
                         {emp.title || "Staff"}
                       </p>
+                      <Badge
+                        variant="outline"
+                        className={`mt-1 w-fit text-[9px] py-0.5 px-1.5 ${
+                          emp.canSubmitTimesheet
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-gray-50 text-gray-500 border-gray-200"
+                        }`}
+                      >
+                        {emp.canSubmitTimesheet ? "Timesheet enabled" : "Timesheet disabled"}
+                      </Badge>
                     </div>
                   </div>
                   {/* Actions buttons */}
                   <div className="flex items-center gap-1 shrink-0">
                     <EmployeeHistoryDialog employeeId={emp.id} employeeName={emp.name} />
                     <EditEmployeeDialog employee={emp} managers={allActiveEmployees} />
+                    <ToggleActiveButton
+                      id={emp.id}
+                      isActive={emp.canSubmitTimesheet}
+                      action={toggleEmployeeTimesheetAccess}
+                      activeLabel="Disable TS"
+                      inactiveLabel="Enable TS"
+                    />
                     <ToggleActiveButton id={emp.id} isActive={emp.isActive} action={toggleEmployeeActive} />
                   </div>
                 </div>

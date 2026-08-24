@@ -27,6 +27,7 @@ type EmployeeInput = {
   phone: string | null;
   role: string;
   title: string | null;
+  canSubmitTimesheet: boolean;
   reportingManagerId: string | null;
   approverOverrideId: string | null;
 };
@@ -166,6 +167,20 @@ export function EditEmployeeDialog({
                   If setting a new one: at least 8 characters, with letters and numbers.
                 </p>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="canSubmitTimesheet"
+                  defaultChecked={employee.canSubmitTimesheet}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 accent-emerald-700"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-gray-800">Enable timesheet access</span>
+                  <span className="text-xs text-muted-foreground">
+                    Controls whether this employee can save or submit timesheets.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
