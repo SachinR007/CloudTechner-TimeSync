@@ -35,8 +35,8 @@ jobs:
         env:
           CREATE_DB_BACKUP: ${{ inputs.create_db_backup }}
           CT_ORBIT_APP_PATH: /home/timesheet/timesheet-app
-          CT_ORBIT_FETCH_URL: ${{ github.workspace }}
-          CT_ORBIT_BRANCH: HEAD
+          CT_ORBIT_FETCH_URL: https://x-access-token:${{ github.token }}@github.com/cloudtechner/ct-orbit.git
+          CT_ORBIT_BRANCH: main
         run: |
           set -euo pipefail
 

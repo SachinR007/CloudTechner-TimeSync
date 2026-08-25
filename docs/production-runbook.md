@@ -13,7 +13,7 @@ Expected runner:
 - Labels: `self-hosted`, `linux`, `arm64`, `ct-orbit-prod`
 - App path: `/home/timesheet/timesheet-app`
 
-The deploy workflow is manual (`workflow_dispatch`) and runs one deployment at a time. It does not need SSH secrets or a long-lived repository token. `actions/checkout` uses GitHub's short-lived token to check out `main` into the runner workspace, and the production app repo fetches from that local checkout path. Validation that needs the production database runs from `/home/timesheet/timesheet-app`, where the real `.env` already exists.
+The deploy workflow is manual (`workflow_dispatch`) and runs one deployment at a time. It does not need SSH secrets or a long-lived repository token. `actions/checkout` uses GitHub's short-lived token to check out `main`, and the production app repo fetches `main` using the same short-lived GitHub Actions token. Validation that needs the production database runs from `/home/timesheet/timesheet-app`, where the real `.env` already exists.
 
 Check runner health on the VM:
 
