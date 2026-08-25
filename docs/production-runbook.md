@@ -27,6 +27,8 @@ Trigger deployment from GitHub:
 
 Use `create_db_backup=true` for normal production deploys.
 
+Production environment approval is optional. If CloudTechner wants an extra approval gate later, add a GitHub environment named `production` with required reviewers, then add `environment: production` back to the deploy job.
+
 ## Manual Deploy On The VM
 
 Run as `timesheet`:

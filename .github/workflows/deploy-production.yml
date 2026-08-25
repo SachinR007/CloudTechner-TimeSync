@@ -24,7 +24,6 @@ jobs:
     name: Deploy on production VM runner
     runs-on: [self-hosted, linux, arm64, ct-orbit-prod]
     timeout-minutes: 25
-    environment: production
     env:
       DATABASE_URL: postgresql://timesheet_app:timesheet_ci_password@127.0.0.1:5432/timesheet_ci
       AUTH_SECRET: ci-only-auth-secret-ci-only-auth-secret-ci-only
