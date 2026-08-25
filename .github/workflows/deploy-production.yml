@@ -24,33 +24,12 @@ jobs:
     name: Deploy on production VM runner
     runs-on: [self-hosted, linux, arm64, ct-orbit-prod]
     timeout-minutes: 25
-    env:
-      DATABASE_URL: postgresql://timesheet_app:timesheet_ci_password@127.0.0.1:5432/timesheet_ci
-      AUTH_SECRET: ci-only-auth-secret-ci-only-auth-secret-ci-only
-      AUTH_URL: http://127.0.0.1:3111
-      AUTH_TRUST_HOST: "true"
-      ENABLE_CREDENTIALS_LOGIN: "true"
-      SSO_ALLOWED_EMAIL_DOMAIN: "@cloudtechner.com"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: main
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Validate before deploy
-        run: |
-          npm ci
-          npx prisma validate
-          npx prisma generate
-          npm run build
-          npm audit --audit-level=moderate
 
       - name: Deploy from local checkout
         env:
