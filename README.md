@@ -7,7 +7,7 @@ CT Orbit is CloudTechner's internal timesheet, allocation, approval, and HR oper
 - Runtime: Next.js/Node.js managed by PM2.
 - Database: PostgreSQL managed outside the app process.
 - Auth: Microsoft SSO through Auth.js.
-- Deployment: GitHub Actions checks plus manual production deployment workflow.
+- Deployment: GitHub Actions checks plus a manual self-hosted runner production workflow.
 
 Production runbook: [docs/production-runbook.md](docs/production-runbook.md)
 

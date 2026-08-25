@@ -2,17 +2,30 @@
 
 This app is deployed as a Node.js/Next.js process managed by PM2. PostgreSQL remains outside the app process and is backed up/restored separately.
 
-## GitHub Secrets For Manual CI/CD Deploy
+## GitHub Self-Hosted Runner Deploy
 
-Configure these repository secrets in `cloudtechner/ct-orbit`:
+Production deploys run on the VM through a repo-level GitHub self-hosted runner.
 
-- `PROD_SSH_HOST`: production VM hostname or IP.
-- `PROD_SSH_USER`: Linux user used by GitHub Actions for SSH. Prefer `timesheet` if it can SSH directly.
-- `PROD_SSH_PRIVATE_KEY`: private key for the SSH user.
-- `PROD_APP_PATH`: `/home/timesheet/timesheet-app`.
-- `PROD_REPO_READ_TOKEN`: read-only GitHub token that can fetch `cloudtechner/ct-orbit`.
+Expected runner:
 
-The deploy workflow is manual (`workflow_dispatch`) and runs one deployment at a time.
+- Service: `actions.runner.cloudtechner-ct-orbit.ct-orbit-prod-runner.service`
+- Linux user: `timesheet`
+- Labels: `self-hosted`, `linux`, `arm64`, `ct-orbit-prod`
+- App path: `/home/timesheet/timesheet-app`
+
+The deploy workflow is manual (`workflow_dispatch`) and runs one deployment at a time. It does not need SSH secrets or a long-lived repository token. `actions/checkout` uses GitHub's short-lived token to check out `main` into the runner workspace, and the production app repo fetches from that local checkout path.
+
+Check runner health on the VM:
+
+```bash
+sudo systemctl status actions.runner.cloudtechner-ct-orbit.ct-orbit-prod-runner.service --no-pager -l
+```
+
+Trigger deployment from GitHub:
+
+`Actions -> Deploy Production -> Run workflow`
+
+Use `create_db_backup=true` for normal production deploys.
 
 ## Manual Deploy On The VM
 

@@ -3,10 +3,6 @@ name: Deploy Production
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: Git ref to deploy
-        required: true
-        default: main
       create_db_backup:
         description: Create a PostgreSQL dump before deployment
         required: true
@@ -25,8 +21,8 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to production VM
-    runs-on: ubuntu-latest
+    name: Deploy on production VM runner
+    runs-on: [self-hosted, linux, arm64, ct-orbit-prod]
     timeout-minutes: 25
     environment: production
     env:
@@ -41,7 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -57,39 +53,17 @@ jobs:
           npm run build
           npm audit --audit-level=moderate
 
-      - name: Configure SSH
+      - name: Deploy from local checkout
         env:
-          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/ct_orbit_prod
-          chmod 600 ~/.ssh/ct_orbit_prod
-          ssh-keyscan -H "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
-
-      - name: Deploy on VM
-        env:
-          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
-          PROD_APP_PATH: ${{ secrets.PROD_APP_PATH }}
-          PROD_REPO_READ_TOKEN: ${{ secrets.PROD_REPO_READ_TOKEN }}
           CREATE_DB_BACKUP: ${{ inputs.create_db_backup }}
-          DEPLOY_REF: ${{ inputs.ref }}
+          CT_ORBIT_APP_PATH: /home/timesheet/timesheet-app
+          CT_ORBIT_FETCH_URL: ${{ github.workspace }}
+          CT_ORBIT_BRANCH: HEAD
         run: |
-          ssh -i ~/.ssh/ct_orbit_prod "$PROD_SSH_USER@$PROD_SSH_HOST" \
-            "CT_ORBIT_FETCH_URL='https://x-access-token:${PROD_REPO_READ_TOKEN}@github.com/cloudtechner/ct-orbit.git' CT_ORBIT_APP_PATH='${PROD_APP_PATH:-/home/timesheet/timesheet-app}' CT_ORBIT_BRANCH='${DEPLOY_REF}' CT_ORBIT_BACKUP_DB='${CREATE_DB_BACKUP}' bash -s" <<'REMOTE'
           set -euo pipefail
 
-          cd "${CT_ORBIT_APP_PATH}"
-
-          if [ "${CT_ORBIT_BACKUP_DB}" = "true" ]; then
-            bash scripts/prod-db-backup.sh
+          if [ "${CREATE_DB_BACKUP}" = "true" ]; then
+            bash "${GITHUB_WORKSPACE}/scripts/prod-db-backup.sh"
           fi
 
-          bash scripts/prod-deploy.sh
-REMOTE
-
-      - name: Remove SSH key
-        if: always()
-        run: rm -f ~/.ssh/ct_orbit_prod
+          bash "${GITHUB_WORKSPACE}/scripts/prod-deploy.sh"
