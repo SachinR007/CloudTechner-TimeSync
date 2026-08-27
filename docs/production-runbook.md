@@ -67,6 +67,44 @@ Backups are written under `/home/timesheet/backups`:
 - `timesheet_counts_<timestamp>.txt`
 - `timesheet_prod_<timestamp>.dump.sha256`
 
+## Backfill Standard Leave Tasks
+
+After deploying code that includes the leave-task template, run this once to add
+the tasks to existing active projects. Preview first:
+
+```bash
+cd /home/timesheet/timesheet-app
+npm run tasks:backfill-leave
+```
+
+Apply after the preview looks correct:
+
+```bash
+npm run tasks:backfill-leave -- --apply
+```
+
+Validate active projects:
+
+```bash
+set -a
+source .env
+set +a
+PSQL_URL="${DATABASE_URL%%\?*}"
+
+psql "$PSQL_URL" -c "
+select p.name,
+       count(t.id) filter (where t.name in ('Casual Leave', 'Sick Leave', 'Privilege Leave')) as leave_task_count
+from \"Project\" p
+left join \"Task\" t on t.\"projectId\" = p.id
+where p.\"isActive\" = true
+group by p.id, p.name
+having count(t.id) filter (where t.name in ('Casual Leave', 'Sick Leave', 'Privilege Leave')) <> 3
+order by p.name;
+"
+```
+
+No rows means every active project has all three standard leave tasks.
+
 ## Restore Old Data
 
 Use only after confirming the exact dump file:

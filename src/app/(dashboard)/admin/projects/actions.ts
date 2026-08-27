@@ -17,7 +17,15 @@ import {
 } from "@/lib/validation";
 import { writeAuditLog } from "@/lib/audit";
 
-const DEFAULT_TASK_TEMPLATE = ["Project work", "Project work - WFH", "Project work - Client", "Training"];
+const DEFAULT_TASK_TEMPLATE = [
+  "Project work",
+  "Project work - WFH",
+  "Project work - Client",
+  "Training",
+  "Casual Leave",
+  "Sick Leave",
+  "Privilege Leave",
+];
 
 const PROJECT_STATUS_VALUES = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "COMPLETED"];
 const BILLING_MODEL_VALUES = ["TIME_AND_MATERIAL", "FIXED_FEE", "RETAINER", "NON_BILLABLE"];

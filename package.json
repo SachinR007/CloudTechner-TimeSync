@@ -9,6 +9,7 @@
     "lint": "eslint",
     "security:regression": "tsx scripts/security-regression.ts",
     "timesheet-access:regression": "tsx scripts/timesheet-access-regression.ts",
+    "tasks:backfill-leave": "tsx scripts/backfill-leave-tasks.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts"
   },
