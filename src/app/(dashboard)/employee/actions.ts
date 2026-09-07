@@ -7,6 +7,7 @@ import { addDays, mondayOf, toISODate } from "@/lib/dates";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
 import { assertTimesheetAccess } from "@/lib/timesheet-access";
 import { parseISODateValue, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
+import { commentsCriteriaForTask } from "@/lib/timesheet-rules";
 
 function parseLines(formData: FormData) {
   const lines: { taskId: string; workDate: string; hours: number; notes: string }[] = [];
@@ -176,7 +177,7 @@ async function upsertTimesheet(
     });
 
     const criteriaMap = new Map(
-      tasksWithCriteria.map((t) => [t.id, t.project.commentsCriteria])
+      tasksWithCriteria.map((t) => [t.id, commentsCriteriaForTask(t.name, t.project.commentsCriteria)])
     );
     // task -> its project (for splitting the week's approval per project)
     const taskProject = new Map(tasksWithCriteria.map((t) => [t.id, t.project]));
