@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LateSubmissionsCard } from "./late-submissions-card";
 import { NotifyButton } from "./notify-button";
 import { employeeSafeSelect } from "@/lib/safe-selects";
+import { HR_ACCESS_ROLES } from "@/lib/roles";
 
 import {
   Table,
@@ -86,7 +87,7 @@ export default async function HrDashboard({
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
-  const user = await requireRole("HR_ADMIN");
+  await requireRole(...HR_ACCESS_ROLES);
   const { week } = await searchParams;
 
   const weekStart = mondayOf(week ? new Date(`${week}T00:00:00.000Z`) : new Date());
