@@ -1,11 +1,11 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { dashboardPathForRole, type Role } from "@/lib/roles";
+import { dashboardPathForRole, HR_ACCESS_ROLES, type Role } from "@/lib/roles";
 
 const PUBLIC_PATHS = ["/login"];
 const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/admin", roles: ["TS_ADMIN"] },
-  { prefix: "/hr", roles: ["HR_ADMIN", "TS_ADMIN"] },
+  { prefix: "/hr", roles: HR_ACCESS_ROLES },
 ];
 
 function matchesPath(pathname: string, prefix: string) {

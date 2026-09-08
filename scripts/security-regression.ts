@@ -232,7 +232,7 @@ async function runChecks() {
     throw new Error(`Concurrent-login invalidation check failed: ${replacedSession.status}`);
   }
 
-  const protectedPaths = ["/admin", "/admin/allocations", "/admin/projects", "/admin/clients", "/admin/projects/sec-project", "/hr/employees"];
+  const protectedPaths = ["/admin", "/admin/allocations", "/admin/projects", "/admin/clients", "/admin/projects/sec-project", "/hr", "/hr/employees"];
   const employeeRows = [];
   for (const path of protectedPaths) {
     const response = await request(employee, path);

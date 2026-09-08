@@ -6,7 +6,7 @@ import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { prisma } from "@/lib/prisma";
 import { SidebarNav, NavItem } from "@/components/sidebar-nav";
 import Link from "next/link";
-import { dashboardPathForRole } from "@/lib/roles";
+import { dashboardPathForRole, hasHrAccess } from "@/lib/roles";
 
 const ROLE_LABEL: Record<string, string> = {
   TS_ADMIN: "Timesheet Admin",
@@ -59,7 +59,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ["TS_ADMIN", "HR_ADMIN", "PROJECT_MANAGER"].includes(userRole);
 
   let pendingRequestsCount = 0;
-  if (userRole === "TS_ADMIN" || userRole === "HR_ADMIN") {
+  if (hasHrAccess(userRole)) {
     pendingRequestsCount = await prisma.allocationRequest.count({
       where: { status: "PENDING" },
     });
@@ -99,9 +99,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     });
   }
 
-  const isAdminOrHR = userRole === "TS_ADMIN" || userRole === "HR_ADMIN";
   const manageItems: NavItem[] = [];
   if (userRole === "TS_ADMIN") {
+    manageItems.push({ href: "/hr", label: "HR dashboard", icon: "admin-dash" as const });
     manageItems.push({ href: "/hr/employees", label: "Employees", icon: "hr-employees" as const });
     manageItems.push({ href: "/admin/clients", label: "Clients", icon: "admin-clients" as const });
     manageItems.push({ href: "/admin/projects", label: "Projects", icon: "admin-projects" as const });

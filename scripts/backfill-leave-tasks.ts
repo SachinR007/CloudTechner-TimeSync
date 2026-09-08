@@ -16,7 +16,13 @@
 
 import { prisma } from "@/lib/prisma";
 
-const LEAVE_TASK_NAMES = ["Casual Leave", "Sick Leave", "Privilege Leave"];
+const LEAVE_TASK_NAMES = [
+  "Casual Leave",
+  "Sick Leave",
+  "Privilege Leave",
+  "Floater Leave",
+  "Special Leave",
+];
 
 function normalizeTaskName(name: string) {
   return name.trim().toLowerCase();
