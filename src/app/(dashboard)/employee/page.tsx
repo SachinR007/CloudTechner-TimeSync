@@ -14,6 +14,7 @@ import { EmployeeTabs } from "./employee-tabs";
 import { computeProjectHistory } from "@/lib/project-history";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
 import { employeeOptionSelect } from "@/lib/safe-selects";
+import { commentsCriteriaForTask } from "@/lib/timesheet-rules";
 
 const STATUS_VARIANT = {
   DRAFT: "secondary",
@@ -106,7 +107,7 @@ export default async function EmployeeDashboard({
         clientName: a.project.client.name,
         allocationStartDate: toISODate(a.startDate),
         allocationEndDate: a.endDate ? toISODate(a.endDate) : null,
-        commentsCriteria: a.project.commentsCriteria,
+        commentsCriteria: commentsCriteriaForTask(t.name, a.project.commentsCriteria),
       });
     }
   }
@@ -142,7 +143,7 @@ export default async function EmployeeDashboard({
           clientName: t.project.client.name,
           allocationStartDate: "",
           allocationEndDate: null,
-          commentsCriteria: t.project.commentsCriteria,
+          commentsCriteria: commentsCriteriaForTask(t.name, t.project.commentsCriteria),
         });
       }
     }

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WEEKDAY_LABELS } from "@/lib/dates";
+import { commentsCriteriaForTask, type TaskCommentsCriteria } from "@/lib/timesheet-rules";
 import { saveDraft, submitTimesheet } from "./actions";
 
 type Task = {
@@ -38,7 +39,7 @@ type Task = {
   clientName: string;
   allocationStartDate: string;
   allocationEndDate: string | null;
-  commentsCriteria: "COMPULSORY" | "OPTIONAL" | "LESS_THAN_8_HOURS" | "MORE_THAN_8_HOURS";
+  commentsCriteria: TaskCommentsCriteria;
 };
 
 export function TimesheetGrid({
@@ -270,7 +271,9 @@ export function TimesheetGrid({
       const [taskId, date] = key.split("__");
       if (val > 0 && activeTaskIds.includes(taskId)) {
         const task = tasks.find((t) => t.id === taskId);
-        const criteria = task?.commentsCriteria ?? "COMPULSORY";
+        const criteria = task
+          ? commentsCriteriaForTask(task.name, task.commentsCriteria)
+          : "COMPULSORY";
 
         let requiresComment = false;
         if (criteria === "COMPULSORY") {
@@ -516,7 +519,9 @@ export function TimesheetGrid({
                                             ...prev,
                                             [key]: v,
                                           }));
-                                          const c = task.commentsCriteria ?? "COMPULSORY";
+                                          const c = task
+                                            ? commentsCriteriaForTask(task.name, task.commentsCriteria)
+                                            : "COMPULSORY";
                                           if (v === 8 && (c === "LESS_THAN_8_HOURS" || c === "MORE_THAN_8_HOURS")) {
                                             setNotes((prev) => {
                                               const next = { ...prev };
@@ -528,7 +533,9 @@ export function TimesheetGrid({
                                         className="w-16 h-8 text-center mx-auto bg-white border-gray-200 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
                                       />
                                       {val > 0 && (hasNote || editable) && (() => {
-                                        const criteria = task.commentsCriteria ?? "COMPULSORY";
+                                        const criteria = task
+                                          ? commentsCriteriaForTask(task.name, task.commentsCriteria)
+                                          : "COMPULSORY";
                                         if ((criteria === "LESS_THAN_8_HOURS" || criteria === "MORE_THAN_8_HOURS") && val === 8) {
                                           return null;
                                         }
