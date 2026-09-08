@@ -25,6 +25,8 @@ const DEFAULT_TASK_TEMPLATE = [
   "Casual Leave",
   "Sick Leave",
   "Privilege Leave",
+  "Floater Leave",
+  "Special Leave",
 ];
 
 const PROJECT_STATUS_VALUES = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "COMPLETED"];

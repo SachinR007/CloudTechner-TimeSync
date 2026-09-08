@@ -227,13 +227,21 @@ async function main() {
     { project: projectC, names: ["Development", "QA", "Admin/Overhead"] },
   ];
 
+  const defaultLeaveTaskNames = [
+    "Casual Leave",
+    "Sick Leave",
+    "Privilege Leave",
+    "Floater Leave",
+    "Special Leave",
+  ];
+
   for (const { project, names } of taskDefs) {
-    for (const name of names) {
+    for (const name of [...names, ...defaultLeaveTaskNames]) {
       await prisma.task.create({
         data: {
           projectId: project.id,
           name,
-          isDefaultTemplate: name === "Admin/Overhead",
+          isDefaultTemplate: name === "Admin/Overhead" || defaultLeaveTaskNames.includes(name),
         },
       });
     }
