@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
 
 type LogItem = {
   id: string;
@@ -26,13 +27,7 @@ export function HistoryList({ initialLogs }: HistoryListProps) {
 
   // Format date helper
   const formatDateStr = (date: Date) => {
-    return new Date(date).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    return formatDisplayDateTime(date);
   };
 
   // Human readable time ago helper
@@ -148,20 +143,20 @@ export function HistoryList({ initialLogs }: HistoryListProps) {
             let subText = "";
 
             if (isApprove) {
-              actionText = `${log.actorName} approved ${log.employeeName}'s Week of ${log.weekStart} timesheet`;
+              actionText = `${log.actorName} approved ${log.employeeName}'s Week of ${formatDisplayDate(log.weekStart)} timesheet`;
               subText = `${log.totalHours} h logged${
                 log.projects.length > 0 ? ` across ${log.projects.join(" and ")}` : ""
               }. Approved without changes.`;
             } else if (isReject) {
-              actionText = `${log.actorName} rejected ${log.employeeName}'s Week of ${log.weekStart} timesheet`;
+              actionText = `${log.actorName} rejected ${log.employeeName}'s Week of ${formatDisplayDate(log.weekStart)} timesheet`;
               subText = log.comments
                 ? `Comment: "${log.comments}" — ${log.employeeName} was notified via email.`
                 : `Rejected without comments.`;
             } else if (log.action === "WITHDRAWN") {
-              actionText = `${log.employeeName} withdrew their Week of ${log.weekStart} timesheet`;
+              actionText = `${log.employeeName} withdrew their Week of ${formatDisplayDate(log.weekStart)} timesheet`;
               subText = `Timesheet pulled back to draft state by the employee.`;
             } else {
-              actionText = `${log.employeeName} submitted Week of ${log.weekStart} timesheet`;
+              actionText = `${log.employeeName} submitted Week of ${formatDisplayDate(log.weekStart)} timesheet`;
               subText = `${log.totalHours} h logged. Waiting on approval from ${log.actorName}.`;
             }
 

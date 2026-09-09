@@ -23,6 +23,7 @@ import {
 import { FileSpreadsheet, Download, FileDown } from "lucide-react";
 import * as XLSX from "@e965/xlsx";
 import { previewTimesheetImport, commitTimesheetImport, exportTimesheets } from "./actions";
+import { formatDisplayDateTime } from "@/lib/dates";
 import {
   type ImportPreviewResult,
   type ImportPreviewReport,
@@ -585,7 +586,7 @@ export function ImportTimesheetsClient({
                     <TableRow key={run.id}>
                       <TableCell className="font-medium">{run.fileName}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(run.importedAt).toLocaleString()}
+                        {formatDisplayDateTime(run.importedAt)}
                       </TableCell>
                       <TableCell className="text-sm">{run.importedByName}</TableCell>
                       <TableCell className="text-center">{run.headersCreated}</TableCell>

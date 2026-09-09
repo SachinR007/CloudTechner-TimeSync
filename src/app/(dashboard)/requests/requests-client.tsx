@@ -35,6 +35,7 @@ import {
 } from "./actions";
 import { toast } from "sonner";
 import { Plus, Check, X, AlertCircle, HelpCircle } from "lucide-react";
+import { formatDisplayDate } from "@/lib/dates";
 
 type Project = {
   id: string;
@@ -269,7 +270,7 @@ export function RequestsClient({
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-gray-500 font-mono">
-                        {new Date(req.createdAt).toLocaleDateString()}
+                        {formatDisplayDate(req.createdAt)}
                       </TableCell>
                       <TableCell className="text-xs text-gray-600 max-w-xs truncate italic">
                         {req.message || <span className="text-gray-300">No message</span>}
@@ -368,10 +369,10 @@ export function RequestsClient({
                         {req.status === "APPROVED" ? `${req.allocationPercentage}%` : "-"}
                       </TableCell>
                       <TableCell className="text-xs text-gray-500 font-mono">
-                        {new Date(req.createdAt).toLocaleDateString()}
+                        {formatDisplayDate(req.createdAt)}
                       </TableCell>
                       <TableCell className="text-xs text-gray-500 font-mono">
-                        {new Date(req.updatedAt).toLocaleDateString()}
+                        {formatDisplayDate(req.updatedAt)}
                       </TableCell>
                       <TableCell className="pr-6 text-right">
                         <Badge

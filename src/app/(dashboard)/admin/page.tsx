@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mondayOf, toISODate, addDays } from "@/lib/dates";
+import { addDays, formatDisplayDate, mondayOf, toISODate } from "@/lib/dates";
 import { employeeOptionSelect } from "@/lib/safe-selects";
 
 export default async function AdminDashboard() {
@@ -41,8 +41,8 @@ export default async function AdminDashboard() {
     tempDate.setDate(tempDate.getDate() + 3 - (tempDate.getDay() + 6) % 7);
     const weekNum = Math.round(((tempDate.getTime() - new Date(tempDate.getFullYear(), 0, 4).getTime()) / 86400000) / 7) + 1;
     
-    const startStr = weekStart.toLocaleString("en-US", { day: "2-digit", month: "short" });
-    const endStr = weekEnd.toLocaleString("en-US", { day: "2-digit", month: "short" });
+    const startStr = formatDisplayDate(weekStart);
+    const endStr = formatDisplayDate(weekEnd);
     
     const weekHeaders = await prisma.timesheetHeader.findMany({
       where: { weekStartDate: weekStart },

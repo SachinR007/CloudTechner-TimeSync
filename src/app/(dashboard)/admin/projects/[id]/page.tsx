@@ -17,6 +17,7 @@ import { EditTaskDialog } from "./edit-task-dialog";
 import { toggleTaskActive } from "./actions";
 import { allocationStatusFor } from "@/lib/allocation";
 import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
+import { formatDisplayDate } from "@/lib/dates";
 
 const STALE_DAYS = 30;
 
@@ -114,8 +115,8 @@ export default async function ProjectDetailPage({
                 <TableRow key={task.id}>
                   <TableCell className="font-medium">{task.name}</TableCell>
                   <TableCell>{task.isDefaultTemplate ? "Default" : "—"}</TableCell>
-                  <TableCell>{task.startDate ? task.startDate.toISOString().slice(0, 10) : "—"}</TableCell>
-                  <TableCell>{task.endDate ? task.endDate.toISOString().slice(0, 10) : "Open"}</TableCell>
+                  <TableCell>{task.startDate ? formatDisplayDate(task.startDate) : "—"}</TableCell>
+                  <TableCell>{task.endDate ? formatDisplayDate(task.endDate) : "Open"}</TableCell>
                   <TableCell>
                     <Badge variant={task.isActive ? "default" : "secondary"}>
                       {task.isActive ? "Active" : "Inactive"}
@@ -171,14 +172,14 @@ export default async function ProjectDetailPage({
                   <TableRow key={a.id}>
                     <TableCell>{a.employee.name}</TableCell>
                     <TableCell>{a.allocationPercentage}%</TableCell>
-                    <TableCell>{a.startDate.toISOString().slice(0, 10)}</TableCell>
-                    <TableCell>{a.endDate ? a.endDate.toISOString().slice(0, 10) : "Open"}</TableCell>
+                    <TableCell>{formatDisplayDate(a.startDate)}</TableCell>
+                    <TableCell>{a.endDate ? formatDisplayDate(a.endDate) : "Open"}</TableCell>
                     <TableCell>
                       <Badge variant={status === "Active" ? "default" : "secondary"}>{status}</Badge>
                     </TableCell>
                     <TableCell>
                       <span className={isStale ? "text-amber-700 font-medium" : "text-muted-foreground"}>
-                        {lastLogged ? lastLogged.toISOString().slice(0, 10) : "Never"}
+                        {lastLogged ? formatDisplayDate(lastLogged) : "Never"}
                         {isStale && ` — no entries in ${STALE_DAYS}+ days, may have moved on`}
                       </span>
                     </TableCell>

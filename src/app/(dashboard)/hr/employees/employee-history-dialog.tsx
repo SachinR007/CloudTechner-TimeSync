@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { History } from "lucide-react";
 import { getEmployeeProjectHistory, type ProjectHistoryEntry } from "./actions";
+import { formatDisplayDate } from "@/lib/dates";
 
 const STATUS_VARIANT: Record<ProjectHistoryEntry["status"], "default" | "secondary" | "outline"> = {
   Active: "default",
@@ -91,8 +92,8 @@ export function EmployeeHistoryDialog({ employeeId, employeeName }: { employeeId
                     <TableCell className="font-medium">{h.projectName}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{h.clientName}</TableCell>
                     <TableCell className="text-center">{h.allocationPercentage}%</TableCell>
-                    <TableCell className="text-sm">{h.startDate}</TableCell>
-                    <TableCell className="text-sm">{h.endDate ?? "Present"}</TableCell>
+                    <TableCell className="text-sm">{formatDisplayDate(h.startDate)}</TableCell>
+                    <TableCell className="text-sm">{h.endDate ? formatDisplayDate(h.endDate) : "Present"}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[h.status]}>{h.status}</Badge>
                     </TableCell>

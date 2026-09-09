@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { dismissNotification } from "./actions";
 import { useTransition } from "react";
+import { formatDisplayDate } from "@/lib/dates";
 
 type Holiday = {
   id: string;
@@ -161,7 +162,7 @@ export function EmployeeTabs({
                 <div className="flex flex-col gap-0.5">
                   <span className="font-semibold text-xs text-left">{notif.message}</span>
                   <span className="text-[10px] text-emerald-600/70 font-mono text-left">
-                    {new Date(notif.createdAt).toLocaleDateString()}
+                    {formatDisplayDate(notif.createdAt)}
                   </span>
                 </div>
               </div>
@@ -365,7 +366,7 @@ export function EmployeeTabs({
                         href={`/employee?week=${t.weekStartDate}`}
                         className="text-emerald-700 hover:text-emerald-800 font-bold hover:underline text-xs"
                       >
-                        {t.weekStartDate}
+                        {formatDisplayDate(t.weekStartDate)}
                       </Link>
                     </TableCell>
                     <TableCell className="font-bold text-gray-700 text-xs">{t.totalHours} h</TableCell>
@@ -493,10 +494,10 @@ export function EmployeeTabs({
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-gray-600 font-mono">{alloc.startDate}</TableCell>
+                      <TableCell className="text-xs text-gray-600 font-mono">{formatDisplayDate(alloc.startDate)}</TableCell>
                       <TableCell className="text-xs text-gray-600 font-mono">
                         {alloc.endDate ? (
-                          alloc.endDate
+                          formatDisplayDate(alloc.endDate)
                         ) : (
                           <span className="text-gray-400 italic font-sans font-normal">Ongoing</span>
                         )}

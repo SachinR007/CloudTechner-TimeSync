@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
+import { formatDisplayDate } from "@/lib/dates";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -353,7 +354,7 @@ export function TimesheetGrid({
                 <TableHead key={date} className="text-center font-bold text-gray-700">
                   {WEEKDAY_LABELS[i]}
                   <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
-                    {date.slice(5)}
+                    {formatDisplayDate(date)}
                   </div>
                 </TableHead>
               ))}
@@ -788,7 +789,7 @@ export function TimesheetGrid({
                 <span className="font-semibold text-gray-700">Task:</span> {commentingCell?.taskName}
               </div>
               <div className="mt-1 font-semibold text-emerald-800">
-                Date: {commentingCell?.date}
+                Date: {formatDisplayDate(commentingCell?.date)}
               </div>
             </div>
             <div className="grid gap-1.5">

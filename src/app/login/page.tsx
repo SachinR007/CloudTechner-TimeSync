@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { azureLoginAction } from "./actions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { azureLoginAction, loginAction } from "./actions";
 
 export default async function LoginPage({
   searchParams,
@@ -15,6 +17,7 @@ export default async function LoginPage({
     !!process.env.AZURE_AD_CLIENT_ID &&
     !!process.env.AZURE_AD_CLIENT_SECRET &&
     !!process.env.AZURE_AD_TENANT_ID;
+  const credentialsAvailable = process.env.ENABLE_CREDENTIALS_LOGIN === "true";
 
   return (
     <div className="fixed inset-0 grid grid-cols-1 md:grid-cols-[1.1fr_1fr] bg-white overflow-auto font-sans">
@@ -98,7 +101,7 @@ export default async function LoginPage({
             </p>
           )}
 
-          {azureAvailable ? (
+          {azureAvailable && (
             <form action={azureLoginAction}>
               <Button type="submit" className="w-full h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-lg shadow-md shadow-emerald-500/10 transition-all duration-150 flex items-center justify-center gap-2">
                 <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true">
@@ -110,9 +113,38 @@ export default async function LoginPage({
                 Sign in with Microsoft
               </Button>
             </form>
-          ) : (
+          )}
+
+          {azureAvailable && credentialsAvailable && (
+            <div className="my-5 flex items-center gap-3 text-xs font-semibold text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />
+              <span>OR LOCAL PASSWORD</span>
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+          )}
+
+          {credentialsAvailable && (
+            <form action={loginAction} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" autoComplete="email" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" name="password" type="password" autoComplete="current-password" required />
+              </div>
+              <Button type="submit" variant="outline" className="w-full h-11 font-semibold">
+                Sign in with password
+              </Button>
+              <p className="text-center text-xs text-amber-700">
+                Local development login only. Keep this disabled in production.
+              </p>
+            </form>
+          )}
+
+          {!azureAvailable && !credentialsAvailable && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Microsoft SSO is not configured for this environment.
+              Microsoft SSO and local password login are not configured for this environment.
             </div>
           )}
         </div>

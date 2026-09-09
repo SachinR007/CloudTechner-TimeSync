@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
-import { addDays, mondayOf, toISODate, weekDates } from "@/lib/dates";
+import { addDays, formatDisplayDate, mondayOf, toISODate, weekDates } from "@/lib/dates";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -446,7 +446,7 @@ export default async function EmployeeDashboard({
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">My Timesheet</h1>
         <p className="text-muted-foreground text-sm">
-          Week of {weekStartISO} – {dates[6]}
+          Week of {formatDisplayDate(weekStartISO)} - {formatDisplayDate(dates[6])}
         </p>
       </div>
 

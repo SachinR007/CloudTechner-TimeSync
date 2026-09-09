@@ -77,6 +77,7 @@ export default async function EmployeesPage() {
       isActive: emp.isActive,
       canSubmitTimesheet: emp.canSubmitTimesheet,
       reportingManager: emp.reportingManager ? { id: emp.reportingManager.id, name: emp.reportingManager.name } : null,
+      approverOverride: emp.approverOverride ? { id: emp.approverOverride.id, name: emp.approverOverride.name } : null,
       reportingManagerId: emp.reportingManagerId,
       approverOverrideId: emp.approverOverrideId,
       totalAllocation,
