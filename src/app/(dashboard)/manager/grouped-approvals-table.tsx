@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { ReviewButton } from "./review-button";
 import type { ReviewLine } from "./review-dialog";
+import { formatDisplayDate } from "@/lib/dates";
 
 export type ApprovalRowData = {
   approvalId: string;
@@ -164,7 +165,7 @@ export function GroupedApprovalsTable({ approvals }: GroupedApprovalsTableProps)
                                     {item.projectName}
                                   </td>
                                   <td className="py-2.5 px-4 font-medium text-gray-600">
-                                    {item.weekStartDate}
+                                    {formatDisplayDate(item.weekStartDate)}
                                   </td>
                                   <td className="py-2.5 px-4 font-bold text-gray-800">
                                     {item.projectHours} hrs

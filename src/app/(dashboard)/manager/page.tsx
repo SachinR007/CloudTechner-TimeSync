@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
-import { toISODate, weekDates } from "@/lib/dates";
+import { formatDisplayDate, toISODate, weekDates } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -145,7 +145,7 @@ export default async function ManagerDashboard({
                 <TableRow key={d.id}>
                   <TableCell>{d.timesheetHeader.employee.name}</TableCell>
                   <TableCell>{d.project.name}</TableCell>
-                  <TableCell>{toISODate(d.timesheetHeader.weekStartDate)}</TableCell>
+                  <TableCell>{formatDisplayDate(d.timesheetHeader.weekStartDate)}</TableCell>
                   <TableCell>
                     <Badge variant={d.status === "APPROVED" ? "default" : "destructive"}>
                       {d.status}

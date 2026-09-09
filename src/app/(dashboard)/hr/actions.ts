@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
 import { parseISODateValue, validateRecordId, validateSafeDisplayText } from "@/lib/validation";
 import { HR_ACCESS_ROLES } from "@/lib/roles";
+import { formatDisplayDate } from "@/lib/dates";
 
 export async function approveLateSubmission(timesheetHeaderId: string) {
   const user = await requireRole(...HR_ACCESS_ROLES);
@@ -101,7 +102,7 @@ export async function sendTimesheetReminder(employeeId: string, weekStartISO: st
   await prisma.notification.create({
     data: {
       employeeId: safeEmployeeId,
-      message: `${user.role === "TS_ADMIN" ? "Timesheet Admin" : "HR"} asked to fill the timesheet for ${weekStartDate.toISOString().slice(0, 10)}.`,
+      message: `${user.role === "TS_ADMIN" ? "Timesheet Admin" : "HR"} asked to fill the timesheet for ${formatDisplayDate(weekStartDate)}.`,
     },
   });
 

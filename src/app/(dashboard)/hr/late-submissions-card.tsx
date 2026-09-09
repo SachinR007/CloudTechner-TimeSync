@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
 
 type LateTimesheet = {
   id: string;
@@ -98,9 +99,9 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
             <TableBody>
               {items.map((item) => {
                 const initials = item.employee.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-                const weekStartStr = new Date(item.weekStartDate).toISOString().split("T")[0];
+                const weekStartStr = formatDisplayDate(item.weekStartDate);
                 const submittedStr = item.submittedAt
-                  ? new Date(item.submittedAt).toLocaleDateString() + " " + new Date(item.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  ? formatDisplayDateTime(item.submittedAt)
                   : "—";
 
                 return (

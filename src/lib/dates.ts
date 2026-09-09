@@ -2,6 +2,36 @@ export function toISODate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Format dates for people while keeping ISO dates for URLs, forms, and the database. */
+export function formatDisplayDate(value: Date | string | null | undefined) {
+  if (!value) return "-";
+
+  const date = value instanceof Date
+    ? value
+    : new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value);
+
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${date.getUTCFullYear()}`;
+}
+
+/** Format a timestamp for people while preserving a stable 24-hour time. */
+export function formatDisplayDateTime(value: Date | string | null | undefined) {
+  if (!value) return "-";
+
+  const date = value instanceof Date
+    ? value
+    : new Date(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) ? `${value}T00:00:00.000Z` : value);
+
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${formatDisplayDate(date)} ${hours}:${minutes}`;
+}
+
 /** Monday (UTC midnight) of the week containing `date`. */
 export function mondayOf(date: Date): Date {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
-import { addDays, mondayOf, mondaysInMonth, toISODate } from "@/lib/dates";
+import { addDays, formatDisplayDate, mondayOf, mondaysInMonth, toISODate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -230,7 +230,7 @@ export default async function HrDashboard({
         <CardHeader className="flex flex-row items-center justify-between border-b border-gray-100 bg-gray-50/50 px-6 py-4">
           <div>
             <CardTitle className="text-lg font-bold text-gray-800">Weekly Tracker</CardTitle>
-            <p className="text-xs text-gray-400 mt-0.5">Viewing submissions for week starting {weekStartISO}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Viewing submissions for week starting {formatDisplayDate(weekStartISO)}</p>
           </div>
           <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-sm">
             <Link href={`/hr?week=${prevWeek}`} passHref>
@@ -241,7 +241,7 @@ export default async function HrDashboard({
               </Button>
             </Link>
             <span className="text-xs font-semibold px-2 text-gray-600 select-none">
-              Week of {weekStartISO.slice(5)}
+              Week of {formatDisplayDate(weekStartISO)}
             </span>
             <Link href={`/hr?week=${nextWeek}`} passHref>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-500 hover:text-foreground">

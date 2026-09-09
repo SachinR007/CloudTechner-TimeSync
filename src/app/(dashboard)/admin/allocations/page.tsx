@@ -14,6 +14,7 @@ import { CreateAllocationDialog } from "./create-allocation-dialog";
 import { AllocationRowActions } from "./allocation-row-actions";
 import { allocationStatusFor, type AllocationStatusLabel } from "@/lib/allocation";
 import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
+import { formatDisplayDate } from "@/lib/dates";
 
 const SORT_KEYS = ["employee", "project", "percentage", "start", "end", "status"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -48,20 +49,6 @@ export default async function AllocationsPage({
     prisma.project.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const utilization = new Map<string, number>();
-  for (const a of allocations) {
-    const active =
-      a.startDate <= today &&
-      (!a.endDate || a.endDate > today) &&
-      a.project.isActive &&
-      a.employee.isActive;
-    if (active) {
-      utilization.set(a.employeeId, (utilization.get(a.employeeId) ?? 0) + a.allocationPercentage);
-    }
-  }
-
   const decorated = allocations.map((a) => ({
     ...a,
     status: statusFor(a.startDate, a.endDate, a.employee.isActive, a.project.isActive),
@@ -95,30 +82,6 @@ export default async function AllocationsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Current utilization</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            {employees.map((e) => {
-              const pct = utilization.get(e.id) ?? 0;
-              return (
-                <div
-                  key={e.id}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm"
-                >
-                  <span>{e.name}</span>
-                  <Badge variant={pct > 100 ? "destructive" : pct === 100 ? "default" : "secondary"}>
-                    {pct}%
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Allocations</CardTitle>
@@ -155,9 +118,9 @@ export default async function AllocationsPage({
                   <TableCell className="font-medium">{a.employee.name}</TableCell>
                   <TableCell>{a.project.name}</TableCell>
                   <TableCell>{a.allocationPercentage}%</TableCell>
-                  <TableCell>{a.startDate.toISOString().slice(0, 10)}</TableCell>
+                  <TableCell>{formatDisplayDate(a.startDate)}</TableCell>
                   <TableCell>
-                    {a.endDate ? a.endDate.toISOString().slice(0, 10) : "Open"}
+                    {a.endDate ? formatDisplayDate(a.endDate) : "Open"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={a.status.variant}>{a.status.label}</Badge>

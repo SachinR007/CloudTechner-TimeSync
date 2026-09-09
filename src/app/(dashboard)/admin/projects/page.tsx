@@ -16,9 +16,10 @@ import { ToggleActiveButton } from "@/components/toggle-active-button";
 import { CreateProjectDialog } from "./create-project-dialog";
 import { toggleProjectActive } from "./actions";
 import { employeeOptionSelect } from "@/lib/safe-selects";
+import { formatDisplayDate } from "@/lib/dates";
 
 function fmtDate(d: Date | null) {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? formatDisplayDate(d) : "—";
 }
 
 export default async function ProjectsPage() {
