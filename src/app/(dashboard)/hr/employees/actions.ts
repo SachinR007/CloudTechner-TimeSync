@@ -160,6 +160,84 @@ export async function getEmployeeProjectHistory(employeeId: string): Promise<Pro
   return computeProjectHistory(validateRecordId(employeeId, "Employee"));
 }
 
+export type EmployeeTimesheetSubmission = {
+  id: string;
+  weekStartDate: string;
+  totalHours: number;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  submittedAt: string | null;
+  approvedAt: string | null;
+  rejectionComments: string | null;
+};
+
+export type EmployeeHistoryDetails = {
+  employeeName: string;
+  availablePeriods: string[];
+  selectedPeriod: string | null;
+  timesheets: EmployeeTimesheetSubmission[];
+  projectHistory: ProjectHistoryEntry[];
+};
+
+function parseTimesheetPeriod(period: string | undefined) {
+  if (!period) return null;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period);
+  if (!match) throw new Error("Invalid timesheet month.");
+  return { year: Number(match[1]), month: Number(match[2]) };
+}
+
+export async function getEmployeeHistoryDetails(
+  id: string,
+  period?: string
+): Promise<EmployeeHistoryDetails> {
+  await requireRole("HR_ADMIN", "TS_ADMIN");
+  const employeeId = validateRecordId(id, "Employee");
+  const requestedPeriod = parseTimesheetPeriod(period);
+
+  const [employee, headers, projectHistory] = await Promise.all([
+    prisma.employee.findUniqueOrThrow({ where: { id: employeeId }, select: { name: true } }),
+    prisma.timesheetHeader.findMany({
+      where: { employeeId },
+      select: { weekStartDate: true },
+      orderBy: { weekStartDate: "desc" },
+    }),
+    computeProjectHistory(employeeId),
+  ]);
+
+  const availablePeriods = Array.from(new Set(headers.map((header) => header.weekStartDate.toISOString().slice(0, 7))));
+  const selectedPeriod = requestedPeriod ? period! : availablePeriods[0] ?? null;
+
+  let timesheets: EmployeeTimesheetSubmission[] = [];
+  if (selectedPeriod) {
+    const selected = parseTimesheetPeriod(selectedPeriod)!;
+    const start = new Date(Date.UTC(selected.year, selected.month - 1, 1));
+    const end = new Date(Date.UTC(selected.year, selected.month, 1));
+    const monthHeaders = await prisma.timesheetHeader.findMany({
+      where: { employeeId, weekStartDate: { gte: start, lt: end } },
+      select: {
+        id: true,
+        weekStartDate: true,
+        totalHours: true,
+        status: true,
+        submittedAt: true,
+        approvedAt: true,
+        rejectionComments: true,
+      },
+      orderBy: { weekStartDate: "desc" },
+    });
+    timesheets = monthHeaders.map((header) => ({
+      id: header.id,
+      weekStartDate: header.weekStartDate.toISOString().slice(0, 10),
+      totalHours: Number(header.totalHours ?? 0),
+      status: header.status,
+      submittedAt: header.submittedAt?.toISOString() ?? null,
+      approvedAt: header.approvedAt?.toISOString() ?? null,
+      rejectionComments: header.rejectionComments,
+    }));
+  }
+
+  return { employeeName: employee.name, availablePeriods, selectedPeriod, timesheets, projectHistory };
+}
+
 export async function updateEmployee(id: string, formData: FormData) {
   const actor = await requireRole("HR_ADMIN", "TS_ADMIN");
   const employeeId = validateRecordId(id, "Employee");

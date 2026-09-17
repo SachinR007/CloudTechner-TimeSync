@@ -11,7 +11,7 @@ export function hasHrAccess(role: Role): boolean {
 export function dashboardPathForRole(role: Role): string {
   switch (role) {
     case "TS_ADMIN":
-      return "/admin";
+      return "/employee";
     case "HR_ADMIN":
       return "/hr";
     case "PROJECT_MANAGER":

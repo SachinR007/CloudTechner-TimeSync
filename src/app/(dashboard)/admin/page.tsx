@@ -2,12 +2,12 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { addDays, formatDisplayDate, mondayOf, toISODate } from "@/lib/dates";
+import { addDays, formatDisplayDate, mondayOf } from "@/lib/dates";
 import { employeeOptionSelect } from "@/lib/safe-selects";
+import { ActiveProjectsCard, type ActiveProjectRow } from "@/components/admin/active-projects-card";
 
 export default async function AdminDashboard() {
-  const user = await requireRole("TS_ADMIN");
+  await requireRole("TS_ADMIN");
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -61,21 +61,29 @@ export default async function AdminDashboard() {
 
   // 4. Fetch active projects (clients and allocations)
   const activeProjects = await prisma.project.findMany({
-    where: { isActive: true },
+    where: { isActive: true, client: { isActive: true } },
     include: {
-      client: true,
+      client: { select: { name: true } },
       allocations: {
         where: {
           startDate: { lte: today },
           OR: [
             { endDate: null },
-            { endDate: { gte: today } },
+            { endDate: { gt: today } },
           ],
+          employee: { isActive: true },
         },
       },
     },
-    take: 5,
   });
+  const activeProjectRows: ActiveProjectRow[] = activeProjects
+    .map((project) => ({
+      id: project.id,
+      name: project.name,
+      clientName: project.client.name,
+      teamSize: project.allocations.length,
+    }))
+    .sort((a, b) => b.teamSize - a.teamSize || a.name.localeCompare(b.name));
 
   // 5. Fetch overallocation data. Only allocations on active projects for
   // active employees count toward utilization -- a deactivated project (or a
@@ -110,8 +118,6 @@ export default async function AdminDashboard() {
     .filter((emp) => emp.total > 100);
 
   // Sum up all projects
-  const totalActiveProjects = await prisma.project.count({ where: { isActive: true } });
-
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       {/* Premium Header */}
@@ -211,44 +217,7 @@ export default async function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Right Column: Active projects */}
-        <Card className="lg:col-span-2 border border-gray-200/80 shadow-sm bg-white">
-          <CardHeader className="border-b border-gray-100 bg-gray-50/40 py-4 px-5 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-bold text-gray-800">Active projects</CardTitle>
-            <span className="rounded-full bg-gray-100 border border-gray-200 text-gray-600 px-2 py-0.5 text-[10px] font-bold select-none">
-              {totalActiveProjects} Active
-            </span>
-          </CardHeader>
-          <CardContent className="p-0 overflow-hidden">
-            <table className="w-full border-collapse text-left text-xs">
-              <thead>
-                <tr className="bg-gray-50/30 border-b border-gray-100 font-bold text-gray-500 select-none">
-                  <th className="py-3 px-5">PROJECT</th>
-                  <th className="py-3 px-5">CLIENT</th>
-                  <th className="py-3 px-5 text-right">TEAM</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {activeProjects.map((proj) => (
-                  <tr key={proj.id} className="hover:bg-gray-50/30 transition-colors">
-                    <td className="py-3 px-5 font-bold text-gray-800">{proj.name}</td>
-                    <td className="py-3 px-5 text-gray-500 font-medium">{proj.client.name}</td>
-                    <td className="py-3 px-5 text-right font-semibold text-gray-700">
-                      {proj.allocations.length}
-                    </td>
-                  </tr>
-                ))}
-                {activeProjects.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-muted-foreground font-medium">
-                      No active projects found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <ActiveProjectsCard projects={activeProjectRows} />
       </div>
 
       {/* Bottom Area: Employee Allocation and Overallocation Alerts */}
