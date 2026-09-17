@@ -147,6 +147,8 @@ export function HolidaysClient({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("holidayPlanId", selectedPlanId);
+    // Allow the same spreadsheet to be selected again for another plan.
+    e.currentTarget.value = "";
 
     startTransition(async () => {
       try {
@@ -541,6 +543,9 @@ export function HolidaysClient({
               </CardTitle>
               <p className="text-[10px] text-gray-400 leading-relaxed font-medium">
                 Employees following this rule will be added to this holiday plan automatically.
+              </p>
+              <p className="text-[10px] text-amber-700 leading-relaxed">
+                Each employee receives the company default plus one client holiday plan. Assigning a different client plan moves them from the previous one.
               </p>
             </CardHeader>
             <CardContent className="p-3 flex-1 flex flex-col overflow-hidden">

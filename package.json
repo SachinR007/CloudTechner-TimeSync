@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "security:regression": "tsx scripts/security-regression.ts",
+    "holidays:regression": "tsx scripts/holiday-plan-regression.ts",
     "notifications:regression": "tsx scripts/notification-regression.ts",
     "timesheet-access:regression": "tsx scripts/timesheet-access-regression.ts",
     "leave-comments:regression": "tsx scripts/leave-task-comment-regression.ts",

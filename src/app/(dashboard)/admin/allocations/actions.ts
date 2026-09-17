@@ -178,11 +178,20 @@ export async function endAllocationToday(id: string) {
   revalidatePath(`/admin/projects/${allocation.projectId}`);
 }
 
-export async function updateAllocationDates(id: string, startDateStr: string, endDateStr: string | null) {
+export async function updateAllocation(
+  id: string,
+  percentageValue: number,
+  startDateStr: string,
+  endDateStr: string | null
+) {
   const actor = await requireRole("TS_ADMIN");
   const allocationId = validateRecordId(id, "Allocation");
+  const percentage = Number(percentageValue);
 
   if (!startDateStr) throw new Error("Start date is required");
+  if (!isValidAllocationPercentage(percentage)) {
+    throw new Error("Allocation must be between 5% and 100%, in 5% steps");
+  }
   const startDate = parseISODateValue(startDateStr, "Start date");
   const endDate = parseISODateValue(endDateStr, "End date");
   if (!startDate) throw new Error("Start date is required");
@@ -193,7 +202,7 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
   try {
     updated = await prisma.projectAllocation.update({
       where: { id: allocationId },
-      data: { startDate, endDate },
+      data: { allocationPercentage: percentage, startDate, endDate },
     });
   } catch (e: unknown) {
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
@@ -203,11 +212,13 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
   }
   await writeAuditLog({
     actor,
-    action: "ALLOCATION_DATES_UPDATED",
+    action: "ALLOCATION_UPDATED",
     entity: "ProjectAllocation",
     entityId: allocationId,
     summary: `${actor.name ?? actor.id} updated allocation dates ${allocationId}.`,
     metadata: {
+      oldPercentage: existing.allocationPercentage,
+      newPercentage: percentage,
       oldStartDate: existing.startDate.toISOString(),
       oldEndDate: existing.endDate?.toISOString() ?? null,
       newStartDate: startDate.toISOString(),
@@ -217,6 +228,8 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
 
   revalidatePath("/admin/allocations");
   revalidatePath(`/admin/projects/${updated.projectId}`);
+  revalidatePath("/hr/employees");
+  revalidatePath("/employee");
 }
 
 export async function deleteAllocation(id: string) {

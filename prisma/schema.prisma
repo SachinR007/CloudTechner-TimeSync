@@ -305,6 +305,8 @@ model Holiday {
 
   holidayPlanId String
   holidayPlan   HolidayPlan @relation(fields: [holidayPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([holidayPlanId, date])
 }
 
 // One row per bulk timesheet import run (see hr/import-timesheets), so admins can
