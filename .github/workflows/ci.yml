@@ -72,5 +72,8 @@ jobs:
       - name: Security regression
         run: npm run security:regression
 
+      - name: Notification regression
+        run: npm run notifications:regression
+
       - name: Dependency audit
         run: npm audit --audit-level=moderate

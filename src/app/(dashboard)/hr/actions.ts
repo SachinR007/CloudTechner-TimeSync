@@ -98,24 +98,17 @@ export async function sendTimesheetReminder(employeeId: string, weekStartISO: st
     select: { name: true, reportingManagerId: true },
   });
 
-  // 1. Notify employee
-  await prisma.notification.create({
-    data: {
-      employeeId: safeEmployeeId,
-      message: `${user.role === "TS_ADMIN" ? "Timesheet Admin" : "HR"} asked to fill the timesheet for ${formatDisplayDate(weekStartDate)}.`,
-    },
-  });
-
-  // 2. Notify reporting manager
-  if (employee.reportingManagerId) {
-    await prisma.notification.create({
-      data: {
-        employeeId: employee.reportingManagerId,
-        message: `${employee.name} did not fill the timesheet of previous week.`,
-      },
-    });
-  }
+  const employeeMessage = `${user.role === "TS_ADMIN" ? "Timesheet Admin" : "HR"} asked to fill the timesheet for ${formatDisplayDate(weekStartDate)}.`;
+  const managerMessage = `${employee.name} did not fill the timesheet for week of ${formatDisplayDate(weekStartDate)}.`;
+  const recipientIds = [safeEmployeeId, employee.reportingManagerId].filter((id): id is string => Boolean(id));
+  const existing = await prisma.notification.findMany({ where: { employeeId: { in: recipientIds }, isRead: false, message: { in: [employeeMessage, managerMessage] } }, select: { employeeId: true, message: true } });
+  const alreadySent = new Set(existing.map((notification) => `${notification.employeeId}:${notification.message}`));
+  const creates = [];
+  if (!alreadySent.has(`${safeEmployeeId}:${employeeMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: safeEmployeeId, message: employeeMessage } }));
+  if (employee.reportingManagerId && !alreadySent.has(`${employee.reportingManagerId}:${managerMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: employee.reportingManagerId, message: managerMessage } }));
+  await prisma.$transaction(creates);
 
   revalidatePath("/hr");
   revalidatePath("/employee");
+  revalidatePath("/", "layout");
 }

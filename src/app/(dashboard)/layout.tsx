@@ -2,11 +2,11 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "./actions";
-import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { prisma } from "@/lib/prisma";
 import { SidebarNav, NavItem } from "@/components/sidebar-nav";
 import Link from "next/link";
 import { dashboardPathForRole, hasHrAccess } from "@/lib/roles";
+import { NotificationBell } from "@/components/notification-bell";
 
 const ROLE_LABEL: Record<string, string> = {
   TS_ADMIN: "Timesheet Admin",
@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userId = session.user.id;
 
   // Query to check if the user has any manager or approval duties
-  const [isDirectManager, isProjectManager, isClientManager, pendingApprovalsCount] = await Promise.all([
+  const [isDirectManager, isProjectManager, isClientManager, pendingApprovalsCount, unreadNotifications] = await Promise.all([
     prisma.employee.count({
       where: {
         OR: [
@@ -50,6 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         },
       },
     }),
+    prisma.notification.findMany({ where: { employeeId: userId, isRead: false }, select: { id: true, message: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 25 }),
   ]);
 
   const hasManagerDuties =
@@ -86,11 +87,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Only TS_ADMIN has access to the Admin Dashboard
   if (userRole === "TS_ADMIN") {
-    workspaceItems.push({
-      href: "/admin",
-      label: "Admin dashboard",
-      icon: "admin-dash" as const,
-    });
   } else if (userRole === "HR_ADMIN") {
     workspaceItems.push({
       href: "/hr",
@@ -101,6 +97,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const manageItems: NavItem[] = [];
   if (userRole === "TS_ADMIN") {
+    manageItems.push({ href: "/admin", label: "Dashboard", icon: "admin-dash" as const });
     manageItems.push({ href: "/hr", label: "HR dashboard", icon: "admin-dash" as const });
     manageItems.push({ href: "/hr/employees", label: "Employees", icon: "hr-employees" as const });
     manageItems.push({ href: "/admin/clients", label: "Clients", icon: "admin-clients" as const });
@@ -157,21 +154,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <span className="truncate text-[10px] text-white/50">{ROLE_LABEL[userRole]}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1">
-              <ChangePasswordDialog />
-            </div>
-            <form action={logoutAction} className="flex">
+          <div className="mt-1">
+            <form action={logoutAction}>
               <Button
                 type="submit"
-                size="sm"
                 variant="ghost"
-                className="px-2.5 h-9 border border-white/10 hover:bg-white/5 text-white/80 hover:text-white"
+                className="h-11 w-full justify-center gap-2 border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/90 hover:bg-white/10 hover:text-white"
                 title="Sign out"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
                 </svg>
+                Logout
               </Button>
             </form>
           </div>
@@ -194,6 +188,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               CT Orbit Portal
             </span>
           </div>
+          <NotificationBell notifications={unreadNotifications.map((notification) => ({ ...notification, createdAt: notification.createdAt.toISOString() }))} />
         </header>
 
         {/* Content Area */}

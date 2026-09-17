@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/table";
 import { ToggleActiveButton } from "@/components/toggle-active-button";
 import { EditEmployeeDialog } from "./edit-employee-dialog";
-import { EmployeeHistoryDialog } from "./employee-history-dialog";
 import { toggleEmployeeActive, toggleEmployeeTimesheetAccess } from "./actions";
 
 type EmployeeItem = {
@@ -158,7 +158,9 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
                           {initialsFor(employee.name)}
                         </div>
                         <div className="min-w-0">
-                          <div className="break-words font-semibold text-gray-900">{employee.name}</div>
+                          <Link href={`/hr/employees/${employee.id}`} className="break-words font-semibold text-gray-900 underline-offset-2 hover:text-emerald-700 hover:underline">
+                            {employee.name}
+                          </Link>
                           <div className="break-all text-xs text-gray-500">{employee.email}</div>
                           <div className="text-xs text-gray-400">{employee.id}{employee.phone ? ` - ${employee.phone}` : ""}</div>
                         </div>
@@ -193,7 +195,6 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
                     </TableCell>
                     <TableCell>
                       <div className="flex min-w-[270px] flex-wrap justify-end gap-1">
-                        <EmployeeHistoryDialog employeeId={employee.id} employeeName={employee.name} />
                         <EditEmployeeDialog employee={employee} managers={allActiveEmployees} />
                         <ToggleActiveButton
                           id={employee.id}

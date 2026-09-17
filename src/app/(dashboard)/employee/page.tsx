@@ -430,17 +430,6 @@ export default async function EmployeeDashboard({
   // the bulk import. See src/lib/project-history.ts.
   const historyAllocations = await computeProjectHistory(user.id);
 
-  const notifications = await prisma.notification.findMany({
-    where: { employeeId: user.id, isRead: false },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const serializedNotifications = notifications.map((n) => ({
-    id: n.id,
-    message: n.message,
-    createdAt: n.createdAt.toISOString(),
-  }));
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -478,7 +467,6 @@ export default async function EmployeeDashboard({
         leaveDates={leaveDates}
         approverName={approverName}
         historyAllocations={historyAllocations}
-        notifications={serializedNotifications}
       />
     </div>
   );
