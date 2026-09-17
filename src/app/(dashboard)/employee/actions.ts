@@ -106,14 +106,11 @@ async function upsertTimesheet(
     const defaultPlan = await prisma.holidayPlan.findFirst({
       where: { isDefault: true },
     });
-    const planIds = [defaultPlan?.id].filter(Boolean) as string[];
-    if (dbUser.holidayPlanId) {
-      planIds.push(dbUser.holidayPlanId);
-    }
+    const planId = dbUser.holidayPlanId ?? defaultPlan?.id;
     const holidays = await prisma.holiday.findMany({
       where: {
         date: { gte: weekStartDate, lte: addDays(weekStartDate, 6) },
-        holidayPlanId: { in: planIds },
+        holidayPlanId: planId ?? "__no_holiday_plan__",
       },
     });
 

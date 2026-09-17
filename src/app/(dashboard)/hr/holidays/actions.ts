@@ -199,16 +199,46 @@ export async function assignEmployeesToPlan(planId: string, employeeIds: string[
   if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
   if (holidayPlan.isDefault) throw new Error("The default plan is company-wide and cannot be assigned manually.");
 
+  const defaultPlan = await prisma.holidayPlan.findFirst({
+    where: { isDefault: true },
+    select: { id: true },
+  });
+  if (!defaultPlan) throw new Error("The default holiday plan is missing. Refresh the page and try again.");
+
   await prisma.$transaction([
     prisma.employee.updateMany({
       where: { holidayPlanId: safePlanId, id: { notIn: safeEmployeeIds } },
-      data: { holidayPlanId: null },
+      data: { holidayPlanId: defaultPlan.id },
     }),
     prisma.employee.updateMany({
       where: { id: { in: safeEmployeeIds } },
       data: { holidayPlanId: safePlanId },
     }),
   ]);
+
+  revalidatePath("/hr/holidays");
+  revalidatePath("/employee");
+}
+
+/** Moves selected employees from a client plan back to the default calendar. */
+export async function removeEmployeesFromPlan(planId: string, employeeIds: string[]) {
+  await requireRole("TS_ADMIN", "HR_ADMIN");
+  const safePlanId = validateRecordId(planId, "Holiday plan");
+  const safeEmployeeIds = employeeIds.map((id) => validateRecordId(id, "Employee"));
+  if (safeEmployeeIds.length === 0) return;
+
+  const [holidayPlan, defaultPlan] = await Promise.all([
+    prisma.holidayPlan.findUnique({ where: { id: safePlanId }, select: { id: true, isDefault: true } }),
+    prisma.holidayPlan.findFirst({ where: { isDefault: true }, select: { id: true } }),
+  ]);
+  if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
+  if (holidayPlan.isDefault) throw new Error("Employees already use the default holiday plan.");
+  if (!defaultPlan) throw new Error("The default holiday plan is missing. Refresh the page and try again.");
+
+  await prisma.employee.updateMany({
+    where: { id: { in: safeEmployeeIds }, holidayPlanId: safePlanId },
+    data: { holidayPlanId: defaultPlan.id },
+  });
 
   revalidatePath("/hr/holidays");
   revalidatePath("/employee");
