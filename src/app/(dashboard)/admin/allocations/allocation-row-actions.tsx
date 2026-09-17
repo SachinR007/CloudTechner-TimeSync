@@ -17,12 +17,14 @@ export function AllocationRowActions({
   canEnd,
   startDate,
   endDate,
+  percentage,
 }: {
   id: string;
   label: string;
   canEnd: boolean;
   startDate: string;
   endDate: string | null;
+  percentage: number;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -47,7 +49,7 @@ export function AllocationRowActions({
 
   return (
     <div className="flex justify-end gap-2">
-      <EditAllocationDialog id={id} label={label} startDate={startDate} endDate={endDate} />
+      <EditAllocationDialog id={id} label={label} startDate={startDate} endDate={endDate} percentage={percentage} />
       {canEnd && (
         <Button size="sm" variant="outline" disabled={isPending} onClick={handleEnd}>
           End

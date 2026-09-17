@@ -75,5 +75,8 @@ jobs:
       - name: Notification regression
         run: npm run notifications:regression
 
+      - name: Holiday plan regression
+        run: npm run holidays:regression
+
       - name: Dependency audit
         run: npm audit --audit-level=moderate
