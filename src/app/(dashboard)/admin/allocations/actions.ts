@@ -3,13 +3,102 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guards";
-import { getMaxOverlapPercentage, isValidAllocationPercentage } from "@/lib/allocation";
+import { isValidAllocationPercentage } from "@/lib/allocation";
 import { parseISODateValue, validateRecordId } from "@/lib/validation";
 import { writeAuditLog } from "@/lib/audit";
+import { computeProjectHistory, type ProjectHistoryStint } from "@/lib/project-history";
 
 function parseDate(value: FormDataEntryValue | null): Date | null {
   const str = String(value ?? "").trim();
   return parseISODateValue(str || null, "Date");
+}
+
+export type EmployeeTimesheetSummary = {
+  id: string;
+  weekStartDate: string;
+  totalHours: number;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  submittedAt: string | null;
+  approvedAt: string | null;
+  rejectionComments: string | null;
+};
+
+export type EmployeeAllocationDetails = {
+  employeeName: string;
+  availablePeriods: string[];
+  selectedPeriod: string | null;
+  timesheets: EmployeeTimesheetSummary[];
+  projectHistory: ProjectHistoryStint[];
+};
+
+function parseTimesheetPeriod(period: string | undefined) {
+  if (!period) return null;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period);
+  if (!match) throw new Error("Invalid timesheet month.");
+  return { year: Number(match[1]), month: Number(match[2]) };
+}
+
+export async function getEmployeeAllocationDetails(
+  id: string,
+  period?: string
+): Promise<EmployeeAllocationDetails> {
+  await requireRole("TS_ADMIN");
+  const employeeId = validateRecordId(id, "Employee");
+  const requestedPeriod = parseTimesheetPeriod(period);
+
+  const [employee, headers, projectHistory] = await Promise.all([
+    prisma.employee.findUniqueOrThrow({
+      where: { id: employeeId },
+      select: { name: true },
+    }),
+    prisma.timesheetHeader.findMany({
+      where: { employeeId },
+      select: { weekStartDate: true },
+      orderBy: { weekStartDate: "desc" },
+    }),
+    computeProjectHistory(employeeId),
+  ]);
+
+  const availablePeriods = Array.from(
+    new Set(headers.map((header) => header.weekStartDate.toISOString().slice(0, 7)))
+  );
+  const selectedPeriod = requestedPeriod
+    ? period!
+    : availablePeriods[0] ?? null;
+
+  let timesheets: EmployeeTimesheetSummary[] = [];
+  if (selectedPeriod) {
+    const selected = parseTimesheetPeriod(selectedPeriod)!;
+    const start = new Date(Date.UTC(selected.year, selected.month - 1, 1));
+    const end = new Date(Date.UTC(selected.year, selected.month, 1));
+    const monthHeaders = await prisma.timesheetHeader.findMany({
+      where: {
+        employeeId,
+        weekStartDate: { gte: start, lt: end },
+      },
+      select: {
+        id: true,
+        weekStartDate: true,
+        totalHours: true,
+        status: true,
+        submittedAt: true,
+        approvedAt: true,
+        rejectionComments: true,
+      },
+      orderBy: { weekStartDate: "desc" },
+    });
+    timesheets = monthHeaders.map((header) => ({
+      id: header.id,
+      weekStartDate: header.weekStartDate.toISOString().slice(0, 10),
+      totalHours: Number(header.totalHours ?? 0),
+      status: header.status,
+      submittedAt: header.submittedAt?.toISOString() ?? null,
+      approvedAt: header.approvedAt?.toISOString() ?? null,
+      rejectionComments: header.rejectionComments,
+    }));
+  }
+
+  return { employeeName: employee.name, availablePeriods, selectedPeriod, timesheets, projectHistory };
 }
 
 export async function createAllocation(formData: FormData) {
@@ -89,11 +178,20 @@ export async function endAllocationToday(id: string) {
   revalidatePath(`/admin/projects/${allocation.projectId}`);
 }
 
-export async function updateAllocationDates(id: string, startDateStr: string, endDateStr: string | null) {
+export async function updateAllocation(
+  id: string,
+  percentageValue: number,
+  startDateStr: string,
+  endDateStr: string | null
+) {
   const actor = await requireRole("TS_ADMIN");
   const allocationId = validateRecordId(id, "Allocation");
+  const percentage = Number(percentageValue);
 
   if (!startDateStr) throw new Error("Start date is required");
+  if (!isValidAllocationPercentage(percentage)) {
+    throw new Error("Allocation must be between 5% and 100%, in 5% steps");
+  }
   const startDate = parseISODateValue(startDateStr, "Start date");
   const endDate = parseISODateValue(endDateStr, "End date");
   if (!startDate) throw new Error("Start date is required");
@@ -104,7 +202,7 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
   try {
     updated = await prisma.projectAllocation.update({
       where: { id: allocationId },
-      data: { startDate, endDate },
+      data: { allocationPercentage: percentage, startDate, endDate },
     });
   } catch (e: unknown) {
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
@@ -114,11 +212,13 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
   }
   await writeAuditLog({
     actor,
-    action: "ALLOCATION_DATES_UPDATED",
+    action: "ALLOCATION_UPDATED",
     entity: "ProjectAllocation",
     entityId: allocationId,
     summary: `${actor.name ?? actor.id} updated allocation dates ${allocationId}.`,
     metadata: {
+      oldPercentage: existing.allocationPercentage,
+      newPercentage: percentage,
       oldStartDate: existing.startDate.toISOString(),
       oldEndDate: existing.endDate?.toISOString() ?? null,
       newStartDate: startDate.toISOString(),
@@ -128,6 +228,8 @@ export async function updateAllocationDates(id: string, startDateStr: string, en
 
   revalidatePath("/admin/allocations");
   revalidatePath(`/admin/projects/${updated.projectId}`);
+  revalidatePath("/hr/employees");
+  revalidatePath("/employee");
 }
 
 export async function deleteAllocation(id: string) {

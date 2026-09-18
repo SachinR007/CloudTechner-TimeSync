@@ -234,7 +234,7 @@ export default async function EmployeeDashboard({
 
   // ── Fetch Holiday Data ──
 
-  // 3. Fetch holidays in this week (default plan + employee's assigned plan)
+  // 3. Fetch holidays from the employee's one effective calendar.
   const dbUser = await prisma.employee.findUniqueOrThrow({
     where: { id: user.id },
     select: { holidayPlanId: true },
@@ -244,10 +244,7 @@ export default async function EmployeeDashboard({
     where: { isDefault: true },
   });
 
-  const planIds = [defaultPlan?.id].filter(Boolean) as string[];
-  if (dbUser.holidayPlanId) {
-    planIds.push(dbUser.holidayPlanId);
-  }
+  const planId = dbUser.holidayPlanId ?? defaultPlan?.id;
 
   const holidays = await prisma.holiday.findMany({
     where: {
@@ -255,9 +252,7 @@ export default async function EmployeeDashboard({
         gte: weekStart,
         lte: weekEnd,
       },
-      holidayPlanId: {
-        in: planIds,
-      },
+      holidayPlanId: planId ?? "__no_holiday_plan__",
     },
   });
 
@@ -292,12 +287,10 @@ export default async function EmployeeDashboard({
     }
   }
 
-  // 5. Fetch all holidays list (default + assigned plan)
+  // 5. Fetch the complete list from the employee's one effective calendar.
   const holidaysListRaw = await prisma.holiday.findMany({
     where: {
-      holidayPlanId: {
-        in: planIds,
-      },
+      holidayPlanId: planId ?? "__no_holiday_plan__",
     },
     orderBy: { date: "asc" },
   });
@@ -430,17 +423,6 @@ export default async function EmployeeDashboard({
   // the bulk import. See src/lib/project-history.ts.
   const historyAllocations = await computeProjectHistory(user.id);
 
-  const notifications = await prisma.notification.findMany({
-    where: { employeeId: user.id, isRead: false },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const serializedNotifications = notifications.map((n) => ({
-    id: n.id,
-    message: n.message,
-    createdAt: n.createdAt.toISOString(),
-  }));
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -478,7 +460,6 @@ export default async function EmployeeDashboard({
         leaveDates={leaveDates}
         approverName={approverName}
         historyAllocations={historyAllocations}
-        notifications={serializedNotifications}
       />
     </div>
   );

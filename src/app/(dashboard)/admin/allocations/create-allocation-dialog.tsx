@@ -11,34 +11,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createBulkAllocations } from "./actions";
 
 export function CreateAllocationDialog({
   employees,
-  projects,
+  fixedProject,
 }: {
   employees: { id: string; name: string }[];
-  projects: { id: string; name: string; code: string | null }[];
+  fixedProject: { id: string; name: string; code: string | null };
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(fixedProject.id);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [employeePercentages, setEmployeePercentages] = useState<Record<string, string>>({});
   const [startDateStr, setStartDateStr] = useState("");
   const [endDateStr, setEndDateStr] = useState("");
 
   function reset() {
-    setProjectId("");
+    setProjectId(fixedProject.id);
     setSelectedEmployeeIds([]);
     setEmployeePercentages({});
     setStartDateStr("");
@@ -50,10 +43,6 @@ export function CreateAllocationDialog({
     e.preventDefault();
     setError(null);
 
-    if (!projectId) {
-      setError("Please select a project.");
-      return;
-    }
     if (selectedEmployeeIds.length === 0) {
       setError("Please select at least one employee.");
       return;
@@ -90,28 +79,11 @@ export function CreateAllocationDialog({
       <DialogTrigger render={<Button className="bg-[#0B3B45] hover:bg-[#123B2A] text-white" />}>New Allocation</DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New Allocation (Bulk Ingestion)</DialogTitle>
+          <DialogTitle>Allocate employees to {fixedProject.name}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>Project *</Label>
-            <Select value={projectId} onValueChange={(v) => setProjectId(v ?? "")}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select project">
-                  {(value) => {
-                    const p = projects.find((proj) => proj.id === value);
-                    return p ? (p.code ? `${p.name} (${p.code})` : p.name) : null;
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.code ? `${p.name} (${p.code})` : p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            Project: <span className="font-semibold text-foreground">{fixedProject.code ? `${fixedProject.name} (${fixedProject.code})` : fixedProject.name}</span>
           </div>
 
           <div className="flex flex-col gap-2">

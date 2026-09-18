@@ -1,152 +1,133 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { SortHeader } from "@/components/sort-header";
-import { CreateAllocationDialog } from "./create-allocation-dialog";
-import { AllocationRowActions } from "./allocation-row-actions";
-import { allocationStatusFor, type AllocationStatusLabel } from "@/lib/allocation";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { allocationStatusFor, todayUTC } from "@/lib/allocation";
 import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
-import { formatDisplayDate } from "@/lib/dates";
+import { CurrentUtilizationChart, type UtilizationBucket } from "@/components/admin/current-utilization-chart";
+import { EmployeeAllocationSummaryTable, type EmployeeAllocationSummary } from "./employee-allocation-summary";
+import { AllocationReportExport, type AllocationReportExportRow } from "./allocation-report-export";
 
-const SORT_KEYS = ["employee", "project", "percentage", "start", "end", "status"] as const;
-type SortKey = (typeof SORT_KEYS)[number];
-
-const STATUS_META: Record<AllocationStatusLabel, { variant: "default" | "secondary" | "outline"; rank: number }> = {
-  Active: { variant: "default", rank: 0 },
-  Upcoming: { variant: "secondary", rank: 1 },
-  Ended: { variant: "outline", rank: 2 },
-  "Project Inactive": { variant: "outline", rank: 3 },
-  "Employee Inactive": { variant: "outline", rank: 4 },
-};
-
-function statusFor(startDate: Date, endDate: Date | null, employeeIsActive: boolean, projectIsActive: boolean) {
-  const label = allocationStatusFor(startDate, endDate, employeeIsActive, projectIsActive);
-  return { label, ...STATUS_META[label] };
-}
-
-export default async function AllocationsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ sort?: string; dir?: string }>;
-}) {
-  const { sort, dir } = await searchParams;
-  const sortKey: SortKey = SORT_KEYS.includes(sort as SortKey) ? (sort as SortKey) : "employee";
-  const sortDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
-
-  const [allocations, employees, projects] = await Promise.all([
+export default async function AllocationsPage() {
+  const today = todayUTC();
+  const [allocations, employees, activeAllocations] = await Promise.all([
     prisma.projectAllocation.findMany({
-      include: { employee: { select: employeeSafeSelect }, project: true },
+      include: {
+        employee: { select: employeeSafeSelect },
+        project: { include: { client: { select: { name: true } } } },
+      },
     }),
-    prisma.employee.findMany({ where: { isActive: true }, select: employeeOptionSelect, orderBy: { name: "asc" } }),
-    prisma.project.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.employee.findMany({
+      where: { isActive: true },
+      select: employeeOptionSelect,
+      orderBy: { name: "asc" },
+    }),
+    prisma.projectAllocation.findMany({
+      where: {
+        startDate: { lte: today },
+        OR: [{ endDate: null }, { endDate: { gt: today } }],
+        project: { isActive: true },
+        employee: { isActive: true },
+      },
+      select: {
+        allocationPercentage: true,
+        employee: { select: employeeOptionSelect },
+      },
+    }),
   ]);
 
-  const decorated = allocations.map((a) => ({
-    ...a,
-    status: statusFor(a.startDate, a.endDate, a.employee.isActive, a.project.isActive),
-  }));
-  decorated.sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "employee":
-        cmp = a.employee.name.localeCompare(b.employee.name);
-        break;
-      case "project":
-        cmp = a.project.name.localeCompare(b.project.name);
-        break;
-      case "percentage":
-        cmp = a.allocationPercentage - b.allocationPercentage;
-        break;
-      case "start":
-        cmp = a.startDate.getTime() - b.startDate.getTime();
-        break;
-      case "end":
-        cmp = (a.endDate?.getTime() ?? Infinity) - (b.endDate?.getTime() ?? Infinity);
-        break;
-      case "status":
-        cmp = a.status.rank - b.status.rank;
-        break;
-    }
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  const utilizationByEmployee = new Map(
+    employees.map((employee) => [employee.id, { id: employee.id, name: employee.name, percentage: 0 }])
+  );
+  for (const allocation of activeAllocations) {
+    const employee = utilizationByEmployee.get(allocation.employee.id);
+    if (employee) employee.percentage += allocation.allocationPercentage;
+  }
+  const bucketsByPercentage = new Map<number, { id: string; name: string }[]>();
+  for (const employee of utilizationByEmployee.values()) {
+    const bucket = bucketsByPercentage.get(employee.percentage) ?? [];
+    bucket.push({ id: employee.id, name: employee.name });
+    bucketsByPercentage.set(employee.percentage, bucket);
+  }
+  const utilizationBuckets: UtilizationBucket[] = Array.from(bucketsByPercentage.entries())
+    .map(([percentage, bucketEmployees]) => ({
+      percentage,
+      employees: bucketEmployees.sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
 
-  const base = "/admin/allocations";
+  const summariesByEmployee = new Map<string, EmployeeAllocationSummary>();
+  for (const allocation of allocations) {
+    const summary = summariesByEmployee.get(allocation.employee.id) ?? {
+      id: allocation.employee.id,
+      name: allocation.employee.name,
+      currentAllocations: [],
+      previousAllocations: [],
+      utilization: 0,
+    };
+    const allocationRow = {
+      id: allocation.id,
+      projectName: allocation.project.name,
+      clientName: allocation.project.client.name,
+      percentage: allocation.allocationPercentage,
+      startDate: allocation.startDate.toISOString(),
+      endDate: allocation.endDate?.toISOString() ?? null,
+    };
+    if (allocationStatusFor(allocation.startDate, allocation.endDate, allocation.employee.isActive, allocation.project.isActive) === "Active") {
+      summary.currentAllocations.push(allocationRow);
+      summary.utilization += allocation.allocationPercentage;
+    } else {
+      summary.previousAllocations.push(allocationRow);
+    }
+    summariesByEmployee.set(allocation.employee.id, summary);
+  }
+  for (const employee of employees) {
+    if (!summariesByEmployee.has(employee.id)) {
+      summariesByEmployee.set(employee.id, {
+        id: employee.id,
+        name: employee.name,
+        currentAllocations: [],
+        previousAllocations: [],
+        utilization: 0,
+      });
+    }
+  }
+  const employeeSummaries = Array.from(summariesByEmployee.values())
+    .map((employee) => ({
+      ...employee,
+      currentAllocations: employee.currentAllocations.sort((a, b) => a.projectName.localeCompare(b.projectName)),
+      previousAllocations: employee.previousAllocations.sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    }))
+    .sort((a, b) => b.utilization - a.utilization || a.name.localeCompare(b.name));
+
+  const exportRows: AllocationReportExportRow[] = allocations
+    .map((allocation) => ({
+      Employee: allocation.employee.name,
+      Client: allocation.project.client.name,
+      Project: allocation.project.name,
+      "Allocation %": allocation.allocationPercentage,
+      "Start date": allocation.startDate.toISOString().slice(0, 10),
+      "End date": allocation.endDate?.toISOString().slice(0, 10) ?? "Open",
+      Status: allocationStatusFor(
+        allocation.startDate,
+        allocation.endDate,
+        allocation.employee.isActive,
+        allocation.project.isActive
+      ),
+    }))
+    .sort((a, b) => a.Employee.localeCompare(b.Employee) || a.Project.localeCompare(b.Project));
 
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Allocations</CardTitle>
-          <CreateAllocationDialog employees={employees} projects={projects} />
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Utilization report</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Review current utilization and allocation history. Manage project teams from Projects.</p>
+          </div>
+          <AllocationReportExport rows={exportRows} />
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <SortHeader label="Employee" sortKey="employee" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead>
-                  <SortHeader label="Project" sortKey="project" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead>
-                  <SortHeader label="%" sortKey="percentage" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead>
-                  <SortHeader label="Start" sortKey="start" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead>
-                  <SortHeader label="End" sortKey="end" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead>
-                  <SortHeader label="Status" sortKey="status" currentSort={sortKey} currentDir={sortDir} basePath={base} />
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {decorated.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.employee.name}</TableCell>
-                  <TableCell>{a.project.name}</TableCell>
-                  <TableCell>{a.allocationPercentage}%</TableCell>
-                  <TableCell>{formatDisplayDate(a.startDate)}</TableCell>
-                  <TableCell>
-                    {a.endDate ? formatDisplayDate(a.endDate) : "Open"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={a.status.variant}>{a.status.label}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <AllocationRowActions
-                      id={a.id}
-                      label={`${a.employee.name} · ${a.project.name}`}
-                      canEnd={a.status.label !== "Ended"}
-                      startDate={a.startDate.toISOString().slice(0, 10)}
-                      endDate={a.endDate ? a.endDate.toISOString().slice(0, 10) : null}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {decorated.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No allocations yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
       </Card>
+      <CurrentUtilizationChart buckets={utilizationBuckets} />
+      <EmployeeAllocationSummaryTable employees={employeeSummaries} />
     </div>
   );
 }

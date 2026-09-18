@@ -26,7 +26,8 @@ import {
   addHolidayManual, 
   deleteHoliday,
   createHolidayPlan,
-  assignEmployeesToPlan
+  assignEmployeesToPlan,
+  removeEmployeesFromPlan,
 } from "./actions";
 import * as XLSX from "@e965/xlsx";
 import { Search, Calendar, Plus, FileSpreadsheet, Trash2, Users, Check, AlertTriangle, Briefcase, HelpCircle } from "lucide-react";
@@ -102,6 +103,11 @@ export function HolidaysClient({
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const selectedPlanEmployees = selectedPlan
+    ? selectedPlan.isDefault
+      ? allEmployees.filter((employee) => !employee.holidayPlanId || employee.holidayPlanId === selectedPlan.id)
+      : selectedPlan.employees
+    : [];
 
   // Search filter plans
   const filteredPlans = plans.filter(p =>
@@ -147,6 +153,8 @@ export function HolidaysClient({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("holidayPlanId", selectedPlanId);
+    // Allow the same spreadsheet to be selected again for another plan.
+    e.currentTarget.value = "";
 
     startTransition(async () => {
       try {
@@ -239,6 +247,17 @@ export function HolidaysClient({
         window.location.reload();
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to save assignments");
+      }
+    });
+  };
+
+  const handleRemoveEmployee = (employeeId: string) => {
+    startTransition(async () => {
+      try {
+        await removeEmployeesFromPlan(selectedPlanId, [employeeId]);
+        window.location.reload();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to move employee to the Default calendar");
       }
     });
   };
@@ -388,7 +407,7 @@ export function HolidaysClient({
                       )}
                     </h2>
                     <span className="text-xs text-gray-400 font-medium">
-                      {selectedPlan.isDefault ? allEmployees.length : selectedPlan.employees.length} Employees Assigned
+                      {selectedPlanEmployees.length} Employees Assigned
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -532,15 +551,18 @@ export function HolidaysClient({
             )}
           </Card>
 
-          {/* RIGHT COLUMN: Rule Based Assignment (3 cols) */}
+          {/* RIGHT COLUMN: Employee Assignment (3 cols) */}
           <Card className="lg:col-span-3 border border-gray-250/60 shadow-sm bg-white overflow-hidden min-h-[600px] flex flex-col">
             <CardHeader className="border-b border-gray-100 bg-gray-50/30 px-4 py-4 flex flex-col gap-1">
               <CardTitle className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                 <Users className="h-4 w-4 text-purple-700" />
-                Rule based assignment
+                Employee assignment
               </CardTitle>
               <p className="text-[10px] text-gray-400 leading-relaxed font-medium">
-                Employees following this rule will be added to this holiday plan automatically.
+                Each employee uses exactly one holiday calendar.
+              </p>
+              <p className="text-[10px] text-amber-700 leading-relaxed">
+                Adding an employee moves them from their previous calendar. Remove returns them to the Default calendar.
               </p>
             </CardHeader>
             <CardContent className="p-3 flex-1 flex flex-col overflow-hidden">
@@ -548,7 +570,7 @@ export function HolidaysClient({
                 <>
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                      Assigned Employees ({selectedPlan.isDefault ? allEmployees.length : selectedPlan.employees.length})
+                      Assigned Employees ({selectedPlanEmployees.length})
                     </span>
                     {selectedPlan.isDefault ? (
                       <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/50 px-1.5 py-0.5 rounded select-none">
@@ -559,21 +581,35 @@ export function HolidaysClient({
                         onClick={openAssignModal}
                         className="text-[10px] font-bold text-purple-700 hover:underline"
                       >
-                        Add rule / edit
+                        Manage employees
                       </button>
                     )}
                   </div>
                   <div className="flex-1 overflow-y-auto flex flex-col gap-2">
-                    {(selectedPlan.isDefault ? allEmployees : selectedPlan.employees).map((emp) => (
+                    {selectedPlanEmployees.map((emp) => (
                       <div
                         key={emp.id}
-                        className="p-2 border border-gray-100 rounded-lg bg-gray-50/50 flex flex-col gap-0.5 select-none"
+                        className="p-2 border border-gray-100 rounded-lg bg-gray-50/50 flex items-center justify-between gap-2 select-none"
                       >
-                        <span className="text-xs font-bold text-gray-800">{emp.name}</span>
-                        <span className="text-[10px] text-gray-400 font-medium">{emp.email}</span>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="text-xs font-bold text-gray-800 truncate">{emp.name}</span>
+                          <span className="text-[10px] text-gray-400 font-medium truncate">{emp.email}</span>
+                        </div>
+                        {!selectedPlan.isDefault && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() => handleRemoveEmployee(emp.id)}
+                            className="h-7 shrink-0 px-2 text-[10px] font-semibold"
+                          >
+                            Remove
+                          </Button>
+                        )}
                       </div>
                     ))}
-                    {(selectedPlan.isDefault ? allEmployees : selectedPlan.employees).length === 0 && (
+                    {selectedPlanEmployees.length === 0 && (
                       <div className="text-center text-[10px] text-gray-400 py-12">
                         No employees explicitly assigned to this plan yet.
                       </div>
@@ -813,7 +849,7 @@ export function HolidaysClient({
               Manage Plan Assignment
             </DialogTitle>
             <p className="text-xs text-gray-400">
-              Select employees that should belong to the **{selectedPlan?.name}** holiday plan.
+              Select employees that should use the {selectedPlan?.name} holiday plan. Untick an employee and save to return them to Default.
             </p>
           </DialogHeader>
 

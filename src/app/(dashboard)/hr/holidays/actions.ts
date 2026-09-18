@@ -12,6 +12,8 @@ export async function importHolidaysExcel(formData: FormData) {
 
   const file = formData.get("file") as File;
   const holidayPlanId = validateRecordId(String(formData.get("holidayPlanId") ?? ""), "Holiday plan");
+  const holidayPlan = await prisma.holidayPlan.findUnique({ where: { id: holidayPlanId }, select: { id: true } });
+  if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
   if (!file || file.size === 0) {
     throw new Error("No file uploaded or file is empty.");
   }
@@ -97,32 +99,32 @@ export async function importHolidaysExcel(formData: FormData) {
     throw new Error("No valid holiday records found in the sheet.");
   }
 
-  let insertedCount = 0;
+  let importedCount = 0;
   await prisma.$transaction(async (tx) => {
     for (const hol of holidaysToUpsert) {
-      await tx.holiday.deleteMany({
-        where: {
-          holidayPlanId,
-          date: hol.date,
-        },
-      });
-      await tx.holiday.create({
-        data: {
+      await tx.holiday.upsert({
+        where: { holidayPlanId_date: { holidayPlanId, date: hol.date } },
+        create: {
           name: hol.name,
           date: hol.date,
           isFloaterLeave: hol.isFloaterLeave,
           specialHoliday: hol.specialHoliday,
           holidayPlanId,
         },
+        update: {
+          name: hol.name,
+          isFloaterLeave: hol.isFloaterLeave,
+          specialHoliday: hol.specialHoliday,
+        },
       });
-      insertedCount++;
+      importedCount++;
     }
   });
 
   revalidatePath("/hr/holidays");
   revalidatePath("/employee");
 
-  return { count: insertedCount };
+  return { count: importedCount };
 }
 
 export async function addHolidayManual(
@@ -135,6 +137,8 @@ export async function addHolidayManual(
   await requireRole("TS_ADMIN", "HR_ADMIN");
 
   const safeHolidayPlanId = validateRecordId(holidayPlanId, "Holiday plan");
+  const holidayPlan = await prisma.holidayPlan.findUnique({ where: { id: safeHolidayPlanId }, select: { id: true } });
+  if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
   const safeName = validateSafeDisplayText(name, "Holiday name", 160);
   const safeDate = parseISODateValue(dateStr, "Holiday date");
   if (!safeDate) throw new Error("Holiday date is required.");
@@ -143,20 +147,19 @@ export async function addHolidayManual(
 
   const utcDate = new Date(Date.UTC(safeDate.getUTCFullYear(), safeDate.getUTCMonth(), safeDate.getUTCDate()));
 
-  await prisma.holiday.deleteMany({
-    where: {
-      holidayPlanId: safeHolidayPlanId,
-      date: utcDate,
-    },
-  });
-
-  await prisma.holiday.create({
-    data: {
+  await prisma.holiday.upsert({
+    where: { holidayPlanId_date: { holidayPlanId: safeHolidayPlanId, date: utcDate } },
+    create: {
       name: safeName,
       date: utcDate,
       isFloaterLeave: safeFloaterLeave,
       specialHoliday: safeSpecialHoliday,
       holidayPlanId: safeHolidayPlanId,
+    },
+    update: {
+      name: safeName,
+      isFloaterLeave: safeFloaterLeave,
+      specialHoliday: safeSpecialHoliday,
     },
   });
 
@@ -192,15 +195,49 @@ export async function assignEmployeesToPlan(planId: string, employeeIds: string[
   await requireRole("TS_ADMIN", "HR_ADMIN");
   const safePlanId = validateRecordId(planId, "Holiday plan");
   const safeEmployeeIds = employeeIds.map((id) => validateRecordId(id, "Employee"));
+  const holidayPlan = await prisma.holidayPlan.findUnique({ where: { id: safePlanId }, select: { id: true, isDefault: true } });
+  if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
+  if (holidayPlan.isDefault) throw new Error("The default plan is company-wide and cannot be assigned manually.");
 
-  // Update chosen employees' holidayPlanId to this plan
+  const defaultPlan = await prisma.holidayPlan.findFirst({
+    where: { isDefault: true },
+    select: { id: true },
+  });
+  if (!defaultPlan) throw new Error("The default holiday plan is missing. Refresh the page and try again.");
+
+  await prisma.$transaction([
+    prisma.employee.updateMany({
+      where: { holidayPlanId: safePlanId, id: { notIn: safeEmployeeIds } },
+      data: { holidayPlanId: defaultPlan.id },
+    }),
+    prisma.employee.updateMany({
+      where: { id: { in: safeEmployeeIds } },
+      data: { holidayPlanId: safePlanId },
+    }),
+  ]);
+
+  revalidatePath("/hr/holidays");
+  revalidatePath("/employee");
+}
+
+/** Moves selected employees from a client plan back to the default calendar. */
+export async function removeEmployeesFromPlan(planId: string, employeeIds: string[]) {
+  await requireRole("TS_ADMIN", "HR_ADMIN");
+  const safePlanId = validateRecordId(planId, "Holiday plan");
+  const safeEmployeeIds = employeeIds.map((id) => validateRecordId(id, "Employee"));
+  if (safeEmployeeIds.length === 0) return;
+
+  const [holidayPlan, defaultPlan] = await Promise.all([
+    prisma.holidayPlan.findUnique({ where: { id: safePlanId }, select: { id: true, isDefault: true } }),
+    prisma.holidayPlan.findFirst({ where: { isDefault: true }, select: { id: true } }),
+  ]);
+  if (!holidayPlan) throw new Error("The selected holiday plan no longer exists. Refresh the page and try again.");
+  if (holidayPlan.isDefault) throw new Error("Employees already use the default holiday plan.");
+  if (!defaultPlan) throw new Error("The default holiday plan is missing. Refresh the page and try again.");
+
   await prisma.employee.updateMany({
-    where: {
-      id: { in: safeEmployeeIds },
-    },
-    data: {
-      holidayPlanId: safePlanId,
-    },
+    where: { id: { in: safeEmployeeIds }, holidayPlanId: safePlanId },
+    data: { holidayPlanId: defaultPlan.id },
   });
 
   revalidatePath("/hr/holidays");
