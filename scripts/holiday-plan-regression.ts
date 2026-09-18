@@ -11,8 +11,23 @@ async function main() {
   let firstPlanId: string | undefined;
   let secondPlanId: string | undefined;
   let employeeId: string | undefined;
+  let temporaryDefaultPlanId: string | undefined;
 
   try {
+    // CI starts with an empty migrated database, while production normally
+    // already has a Default plan. Make this regression self-contained in both.
+    let defaultPlan = await prisma.holidayPlan.findFirst({
+      where: { isDefault: true },
+      select: { id: true },
+    });
+    if (!defaultPlan) {
+      defaultPlan = await prisma.holidayPlan.create({
+        data: { name: `${tag} Default`, isDefault: true },
+        select: { id: true },
+      });
+      temporaryDefaultPlanId = defaultPlan.id;
+    }
+
     const [firstPlan, secondPlan] = await prisma.$transaction([
       prisma.holidayPlan.create({ data: { name: `${tag} A` } }),
       prisma.holidayPlan.create({ data: { name: `${tag} B` } }),
@@ -20,10 +35,6 @@ async function main() {
     firstPlanId = firstPlan.id;
     secondPlanId = secondPlan.id;
 
-    const defaultPlan = await prisma.holidayPlan.findFirstOrThrow({
-      where: { isDefault: true },
-      select: { id: true },
-    });
     const employee = await prisma.employee.create({
       data: {
         id: `${tag}-EMPLOYEE`,
@@ -75,6 +86,9 @@ async function main() {
     }
     if (firstPlanId || secondPlanId) {
       await prisma.holidayPlan.deleteMany({ where: { id: { in: [firstPlanId, secondPlanId].filter((id): id is string => Boolean(id)) } } });
+    }
+    if (temporaryDefaultPlanId) {
+      await prisma.holidayPlan.delete({ where: { id: temporaryDefaultPlanId } });
     }
     await prisma.$disconnect();
   }
