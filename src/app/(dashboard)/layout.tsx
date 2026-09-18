@@ -112,7 +112,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const reportItems: NavItem[] = [];
   if (userRole === "TS_ADMIN") {
-    reportItems.push({ href: "/admin/allocations", label: "Utilization", icon: "admin-allocations" as const });
+    reportItems.push({ href: "/admin/allocations", label: "Utilization report", icon: "admin-allocations" as const });
     reportItems.push({ href: "/admin/history", label: "Timesheet history", icon: "timesheet-history" as const });
   }
 

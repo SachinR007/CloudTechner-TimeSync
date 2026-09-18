@@ -1,8 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
-import { AllocationRowActions } from "./allocation-row-actions";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDisplayDate } from "@/lib/dates";
@@ -24,7 +23,7 @@ export type EmployeeAllocationSummary = {
   utilization: number;
 };
 
-function AllocationCard({ allocation, editable }: { allocation: Allocation; editable: boolean }) {
+function AllocationCard({ allocation }: { allocation: Allocation }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -38,16 +37,6 @@ function AllocationCard({ allocation, editable }: { allocation: Allocation; edit
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
         <span>{formatDisplayDate(allocation.startDate)} to {allocation.endDate ? formatDisplayDate(allocation.endDate) : "Open"}</span>
-        {editable && (
-          <AllocationRowActions
-            id={allocation.id}
-            label={`${allocation.projectName} (${allocation.clientName})`}
-            canEnd={!allocation.endDate}
-            startDate={allocation.startDate.slice(0, 10)}
-            endDate={allocation.endDate?.slice(0, 10) ?? null}
-            percentage={allocation.percentage}
-          />
-        )}
       </div>
     </div>
   );
@@ -60,7 +49,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
     <Card>
       <CardHeader>
         <CardTitle>Employee allocations</CardTitle>
-        <p className="text-sm text-muted-foreground">Each employee appears once. Use Manage to edit an active allocation or review past assignments.</p>
+        <p className="text-sm text-muted-foreground">Each employee appears once. Review active utilization and expand a row for previous project assignments.</p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
@@ -69,7 +58,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
               <th className="px-3 py-3">Employee</th>
               <th className="px-3 py-3">Active allocations</th>
               <th className="px-3 py-3 text-right">Utilization</th>
-              <th className="px-3 py-3 text-right">Actions</th>
+              <th className="px-3 py-3 text-right">History</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -84,7 +73,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                         <span className="italic text-muted-foreground">No active project</span>
                       ) : (
                         <div className="grid gap-2 lg:grid-cols-2">
-                          {employee.currentAllocations.map((allocation) => <AllocationCard key={allocation.id} allocation={allocation} editable={expanded} />)}
+                          {employee.currentAllocations.map((allocation) => <AllocationCard key={allocation.id} allocation={allocation} />)}
                         </div>
                       )}
                     </td>
@@ -93,8 +82,8 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                     </td>
                     <td className="px-3 py-4 text-right">
                       <Button type="button" variant="outline" size="sm" onClick={() => setExpandedEmployeeId(expanded ? null : employee.id)}>
-                        {expanded ? <ChevronDown /> : <Settings2 />}
-                        {expanded ? "Close" : "Manage"}
+                        {expanded ? <ChevronDown /> : <ChevronRight />}
+                        {expanded ? "Close" : "View"}
                       </Button>
                     </td>
                   </tr>
@@ -106,7 +95,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                           <p className="text-sm text-muted-foreground">No previous project allocations.</p>
                         ) : (
                           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                            {employee.previousAllocations.map((allocation) => <AllocationCard key={allocation.id} allocation={allocation} editable={false} />)}
+                            {employee.previousAllocations.map((allocation) => <AllocationCard key={allocation.id} allocation={allocation} />)}
                           </div>
                         )}
                       </td>

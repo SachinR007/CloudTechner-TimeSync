@@ -18,6 +18,8 @@ import { toggleTaskActive } from "./actions";
 import { allocationStatusFor } from "@/lib/allocation";
 import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
 import { formatDisplayDate } from "@/lib/dates";
+import { CreateAllocationDialog } from "../../allocations/create-allocation-dialog";
+import { AllocationRowActions } from "../../allocations/allocation-row-actions";
 
 const STALE_DAYS = 30;
 
@@ -147,8 +149,15 @@ export default async function ProjectDetailPage({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Allocated employees</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-base">Project allocations</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Allocate, update, end, or remove this project&apos;s team members.</p>
+          </div>
+          <CreateAllocationDialog
+            employees={employees}
+            fixedProject={{ id: project.id, name: project.name, code: project.code }}
+          />
         </CardHeader>
         <CardContent>
           <Table>
@@ -160,6 +169,7 @@ export default async function ProjectDetailPage({
                 <TableHead>End</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last logged</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -183,13 +193,23 @@ export default async function ProjectDetailPage({
                         {isStale && ` — no entries in ${STALE_DAYS}+ days, may have moved on`}
                       </span>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <AllocationRowActions
+                        id={a.id}
+                        label={`${a.employee.name} on ${project.name}`}
+                        canEnd={status === "Active"}
+                        startDate={a.startDate.toISOString().slice(0, 10)}
+                        endDate={a.endDate?.toISOString().slice(0, 10) ?? null}
+                        percentage={a.allocationPercentage}
+                      />
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {project.allocations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    No allocations yet. Manage these from the Allocations tab.
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    No allocations yet. Use Allocate employees to add this project&apos;s team.
                   </TableCell>
                 </TableRow>
               )}

@@ -1,14 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreateAllocationDialog } from "./create-allocation-dialog";
 import { allocationStatusFor, todayUTC } from "@/lib/allocation";
 import { employeeOptionSelect, employeeSafeSelect } from "@/lib/safe-selects";
 import { CurrentUtilizationChart, type UtilizationBucket } from "@/components/admin/current-utilization-chart";
 import { EmployeeAllocationSummaryTable, type EmployeeAllocationSummary } from "./employee-allocation-summary";
+import { AllocationReportExport, type AllocationReportExportRow } from "./allocation-report-export";
 
 export default async function AllocationsPage() {
   const today = todayUTC();
-  const [allocations, employees, projects, activeAllocations] = await Promise.all([
+  const [allocations, employees, activeAllocations] = await Promise.all([
     prisma.projectAllocation.findMany({
       include: {
         employee: { select: employeeSafeSelect },
@@ -20,7 +20,6 @@ export default async function AllocationsPage() {
       select: employeeOptionSelect,
       orderBy: { name: "asc" },
     }),
-    prisma.project.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     prisma.projectAllocation.findMany({
       where: {
         startDate: { lte: today },
@@ -99,15 +98,35 @@ export default async function AllocationsPage() {
     }))
     .sort((a, b) => b.utilization - a.utilization || a.name.localeCompare(b.name));
 
+  const exportRows: AllocationReportExportRow[] = allocations
+    .map((allocation) => ({
+      Employee: allocation.employee.name,
+      Client: allocation.project.client.name,
+      Project: allocation.project.name,
+      "Allocation %": allocation.allocationPercentage,
+      "Start date": allocation.startDate.toISOString().slice(0, 10),
+      "End date": allocation.endDate?.toISOString().slice(0, 10) ?? "Open",
+      Status: allocationStatusFor(
+        allocation.startDate,
+        allocation.endDate,
+        allocation.employee.isActive,
+        allocation.project.isActive
+      ),
+    }))
+    .sort((a, b) => a.Employee.localeCompare(b.Employee) || a.Project.localeCompare(b.Project));
+
   return (
     <div className="flex flex-col gap-6">
-      <CurrentUtilizationChart buckets={utilizationBuckets} />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Allocations</CardTitle>
-          <CreateAllocationDialog employees={employees} projects={projects} />
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Utilization report</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Review current utilization and allocation history. Manage project teams from Projects.</p>
+          </div>
+          <AllocationReportExport rows={exportRows} />
         </CardHeader>
       </Card>
+      <CurrentUtilizationChart buckets={utilizationBuckets} />
       <EmployeeAllocationSummaryTable employees={employeeSummaries} />
     </div>
   );
