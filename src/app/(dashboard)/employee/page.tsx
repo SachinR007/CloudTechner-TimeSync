@@ -15,6 +15,7 @@ import { computeProjectHistory } from "@/lib/project-history";
 import { isSelfManagedInternalApproval, resolveProjectApprover } from "@/lib/approval";
 import { employeeOptionSelect } from "@/lib/safe-selects";
 import { commentsCriteriaForTask } from "@/lib/timesheet-rules";
+import { defaultTimesheetDate } from "@/lib/timesheet-default";
 
 const STATUS_VARIANT = {
   DRAFT: "secondary",
@@ -26,24 +27,41 @@ const STATUS_VARIANT = {
 export default async function EmployeeDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ week?: string; date?: string }>;
 }) {
   const user = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
-  const { week } = await searchParams;
-  const employeeAccess = await prisma.employee.findUniqueOrThrow({
-    where: { id: user.id },
-    select: { isActive: true, canSubmitTimesheet: true },
-  });
+  const { week, date } = await searchParams;
+  const [employeeAccess, lastLoggedLine, firstEligibleAllocation] = await Promise.all([
+    prisma.employee.findUniqueOrThrow({ where: { id: user.id }, select: { isActive: true, canSubmitTimesheet: true } }),
+    prisma.timesheetLine.findFirst({
+      where: { timesheetHeader: { employeeId: user.id }, hours: { gt: 0 } },
+      orderBy: { workDate: "desc" },
+      select: { workDate: true },
+    }),
+    prisma.projectAllocation.findFirst({
+      where: { employeeId: user.id, project: { isActive: true } },
+      orderBy: { startDate: "asc" },
+      select: { startDate: true },
+    }),
+  ]);
   const canUseTimesheet = employeeAccess.isActive && employeeAccess.canSubmitTimesheet;
   if (!canUseTimesheet) {
     redirect("/not-enabled");
   }
 
-  const weekStart = mondayOf(week ? new Date(`${week}T00:00:00.000Z`) : new Date());
+  const requestedDateValue = date ?? week;
+  const requestedDate = requestedDateValue && /^\d{4}-\d{2}-\d{2}$/.test(requestedDateValue)
+    ? new Date(`${requestedDateValue}T00:00:00.000Z`)
+    : null;
+  const selectedDate = requestedDate && !Number.isNaN(requestedDate.getTime())
+    ? requestedDate
+    : defaultTimesheetDate({ lastLoggedDate: lastLoggedLine?.workDate ?? null, firstEligibleDate: firstEligibleAllocation?.startDate ?? null, today: new Date() });
+  const selectedDateISO = toISODate(selectedDate);
+  const weekStart = mondayOf(selectedDate);
   const weekStartISO = toISODate(weekStart);
   const dates = weekDates(weekStart).map(toISODate);
-  const prevWeek = toISODate(addDays(weekStart, -7));
-  const nextWeek = toISODate(addDays(weekStart, 7));
+  const prevWeek = toISODate(addDays(selectedDate, -7));
+  const nextWeek = toISODate(addDays(selectedDate, 7));
 
   const weekEnd = addDays(weekStart, 6);
   const allocations = await prisma.projectAllocation.findMany({
@@ -336,11 +354,11 @@ export default async function EmployeeDashboard({
     </form>
   );
 
-  const weekDatePicker = <WeekDatePicker currentWeekISO={weekStartISO} />;
+  const weekDatePicker = <WeekDatePicker currentDateISO={selectedDateISO} />;
 
   const prevWeekBtn = (
     <Button
-      render={<Link href={`/employee?week=${prevWeek}`} />}
+      render={<Link href={`/employee?date=${prevWeek}`} />}
       variant="outline"
       size="sm"
       className="hover:bg-gray-50 border-gray-200"
@@ -351,7 +369,7 @@ export default async function EmployeeDashboard({
 
   const nextWeekBtn = (
     <Button
-      render={<Link href={`/employee?week=${nextWeek}`} />}
+      render={<Link href={`/employee?date=${nextWeek}`} />}
       variant="outline"
       size="sm"
       className="hover:bg-gray-50 border-gray-200"
@@ -434,6 +452,7 @@ export default async function EmployeeDashboard({
 
       <EmployeeTabs
         weekStartISO={weekStartISO}
+        focusDateISO={selectedDateISO}
         dates={dates}
         tasks={tasks}
         initialHours={initialHours}

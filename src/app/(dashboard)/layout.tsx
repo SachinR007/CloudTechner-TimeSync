@@ -50,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         },
       },
     }),
-    prisma.notification.findMany({ where: { employeeId: userId, isRead: false }, select: { id: true, message: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 25 }),
+    prisma.notification.findMany({ where: { employeeId: userId, isRead: false }, select: { id: true, message: true, kind: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 25 }),
   ]);
 
   const hasManagerDuties =

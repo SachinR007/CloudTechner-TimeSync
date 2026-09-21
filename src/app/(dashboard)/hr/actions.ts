@@ -105,7 +105,7 @@ export async function sendTimesheetReminder(employeeId: string, weekStartISO: st
   const alreadySent = new Set(existing.map((notification) => `${notification.employeeId}:${notification.message}`));
   const creates = [];
   if (!alreadySent.has(`${safeEmployeeId}:${employeeMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: safeEmployeeId, message: employeeMessage } }));
-  if (employee.reportingManagerId && !alreadySent.has(`${employee.reportingManagerId}:${managerMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: employee.reportingManagerId, message: managerMessage } }));
+  if (employee.reportingManagerId && !alreadySent.has(`${employee.reportingManagerId}:${managerMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: employee.reportingManagerId, message: managerMessage, kind: "MISSED_TIMESHEET", subjectEmployeeId: safeEmployeeId } }));
   await prisma.$transaction(creates);
 
   revalidatePath("/hr");

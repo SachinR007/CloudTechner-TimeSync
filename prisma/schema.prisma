@@ -375,10 +375,21 @@ model Notification {
   employeeId String
   employee   Employee @relation("EmployeeNotifications", fields: [employeeId], references: [id], onDelete: Cascade)
   message    String
+  kind       NotificationKind @default(GENERAL)
+  // When a notification concerns someone other than its recipient, this
+  // identifies that employee. It makes team reminders reportable without
+  // parsing a display name out of the message text.
+  subjectEmployeeId String?
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@index([employeeId])
+  @@index([kind, subjectEmployeeId])
+}
+
+enum NotificationKind {
+  GENERAL
+  MISSED_TIMESHEET
 }
 
 model AuditLog {
