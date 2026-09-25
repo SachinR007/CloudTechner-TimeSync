@@ -118,7 +118,7 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
                 key={tab.id}
                 type="button"
                 onClick={() => setActivityFilter(tab.id)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${activityFilter === tab.id ? "bg-emerald-850 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${activityFilter === tab.id ? "bg-emerald-700 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 {tab.label} ({getActivityCount(tab.id)})
               </button>
@@ -130,7 +130,7 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedTab(tab.id)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${selectedTab === tab.id ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${selectedTab === tab.id ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 {tab.label} ({getTabCount(tab.id)})
               </button>

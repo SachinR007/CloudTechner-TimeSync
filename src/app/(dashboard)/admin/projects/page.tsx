@@ -57,7 +57,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <Link
                 key={tab.id}
                 href={tab.id === "all" ? "/admin/projects" : `/admin/projects?status=${tab.id}`}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${activityFilter === tab.id ? "bg-emerald-850 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${activityFilter === tab.id ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 {tab.label} ({tab.count})
               </Link>

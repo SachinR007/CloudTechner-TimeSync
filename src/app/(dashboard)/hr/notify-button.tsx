@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { sendTimesheetReminder } from "./actions";
+import { captureDashboardScroll, restoreDashboardScroll } from "@/lib/dashboard-scroll";
 
 interface NotifyButtonProps {
   employeeId: string;
@@ -16,13 +17,16 @@ export function NotifyButton({ employeeId, weekStartISO }: NotifyButtonProps) {
 
   const handleNotify = () => {
     if (sent) return;
+    const scroll = captureDashboardScroll();
     startTransition(async () => {
       try {
         await sendTimesheetReminder(employeeId, weekStartISO);
+        restoreDashboardScroll(scroll);
         setSent(true);
         // Reset sent status after 3 seconds
         setTimeout(() => setSent(false), 3000);
       } catch (err) {
+        restoreDashboardScroll(scroll);
         alert(err instanceof Error ? err.message : "Failed to send notification");
       }
     });

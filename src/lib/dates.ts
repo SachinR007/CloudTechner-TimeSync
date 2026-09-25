@@ -47,6 +47,13 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
+/** A human-readable inclusive Monday-Sunday period for timesheets and reminders. */
+export function formatWeekRange(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(`${value}T00:00:00.000Z`);
+  const start = mondayOf(date);
+  return `${formatDisplayDate(start)} – ${formatDisplayDate(addDays(start, 6))}`;
+}
+
 export function weekDates(monday: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }

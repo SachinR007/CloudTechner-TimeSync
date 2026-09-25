@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { WEEKDAY_LABELS } from "@/lib/dates";
 import { approveProjectApproval, rejectProjectApproval } from "./actions";
+import { captureDashboardScroll, restoreDashboardScroll } from "@/lib/dashboard-scroll";
 
 export type ReviewLine = {
   taskId: string;
@@ -74,11 +75,14 @@ export function ReviewDialog({
 
   function handleApprove() {
     setError(null);
+    const scroll = captureDashboardScroll();
     startTransition(async () => {
       try {
         await approveProjectApproval(approvalId);
+        restoreDashboardScroll(scroll);
         onOpenChange(false);
       } catch (e) {
+        restoreDashboardScroll(scroll);
         setError(e instanceof Error ? e.message : "Failed to approve");
       }
     });
@@ -86,11 +90,14 @@ export function ReviewDialog({
 
   function handleReject() {
     setError(null);
+    const scroll = captureDashboardScroll();
     startTransition(async () => {
       try {
         await rejectProjectApproval(approvalId, rejectComments);
+        restoreDashboardScroll(scroll);
         onOpenChange(false);
       } catch (e) {
+        restoreDashboardScroll(scroll);
         setError(e instanceof Error ? e.message : "Failed to reject");
       }
     });

@@ -89,7 +89,7 @@ export function HistoryList({ initialLogs }: HistoryListProps) {
                 onClick={() => setSelectedTab(tab)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
                   isActive
-                    ? "bg-emerald-850 text-white shadow-sm"
+                    ? "bg-emerald-700 text-white shadow-sm"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >

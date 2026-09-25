@@ -3,20 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
+import { formatDisplayDate, formatDisplayDateTime, formatWeekRange } from "@/lib/dates";
 import type { ProjectHistoryStint } from "@/lib/project-history";
 
 type Timesheet = {
   id: string;
   weekStartDate: string;
   totalHours: number;
-  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "PENDING";
   submittedAt: string | null;
   approvedAt: string | null;
   rejectionComments: string | null;
 };
 
-const statusVariant = { DRAFT: "secondary", SUBMITTED: "outline", APPROVED: "default", REJECTED: "destructive" } as const;
+const statusVariant = { DRAFT: "secondary", SUBMITTED: "outline", APPROVED: "default", REJECTED: "destructive", PENDING: "destructive" } as const;
 
 function periodLabel(period: string) {
   return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" })
@@ -46,7 +46,7 @@ export function EmployeeDetailsTabs({ employeeId, periods, selectedPeriod, times
           {periods.map((period) => <option key={period} value={period}>{periodLabel(period)}</option>)}
         </select>
       </div>
-      {timesheets.length === 0 ? <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No timesheet submissions for this month.</p> : <div className="overflow-x-auto rounded-lg border"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-3">Week</th><th className="px-4 py-3">Hours</th><th className="px-4 py-3">Submitted</th><th className="px-4 py-3">Status</th></tr></thead><tbody className="divide-y">{timesheets.map((timesheet) => <tr key={timesheet.id}><td className="px-4 py-3 font-medium">{formatDisplayDate(timesheet.weekStartDate)}</td><td className="px-4 py-3">{timesheet.totalHours} h</td><td className="px-4 py-3 text-muted-foreground">{formatDisplayDateTime(timesheet.submittedAt)}</td><td className="px-4 py-3"><Badge variant={statusVariant[timesheet.status]}>{timesheet.status}</Badge>{timesheet.rejectionComments && <p className="mt-1 text-xs text-destructive">{timesheet.rejectionComments}</p>}</td></tr>)}</tbody></table></div>}
+      {timesheets.length === 0 ? <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No eligible timesheet weeks for this month.</p> : <div className="overflow-x-auto rounded-lg border"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-3">Week</th><th className="px-4 py-3">Hours</th><th className="px-4 py-3">Submitted</th><th className="px-4 py-3">Status</th></tr></thead><tbody className="divide-y">{timesheets.map((timesheet) => <tr key={timesheet.id}><td className="px-4 py-3 font-medium">{formatWeekRange(timesheet.weekStartDate)}</td><td className="px-4 py-3">{timesheet.totalHours} h</td><td className="px-4 py-3 text-muted-foreground">{formatDisplayDateTime(timesheet.submittedAt)}</td><td className="px-4 py-3"><Badge variant={statusVariant[timesheet.status]}>{timesheet.status === "PENDING" ? "Pending submission" : timesheet.status}</Badge>{timesheet.rejectionComments && <p className="mt-1 text-xs text-destructive">{timesheet.rejectionComments}</p>}</td></tr>)}</tbody></table></div>}
     </section>}
 
     {tab === "projects" && <section className="space-y-4"><div><h2 className="font-semibold">Project history</h2><p className="text-sm text-muted-foreground">Projects derived from recorded timesheet work.</p></div>

@@ -192,7 +192,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+        <main data-dashboard-scroll className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
           {children}
         </main>
       </div>

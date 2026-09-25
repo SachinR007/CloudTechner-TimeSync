@@ -10,6 +10,7 @@ import {
   fetchAllEmployeesForExport,
   fetchExportYearRange,
   buildExportRows,
+  buildWeeklyExportRows,
   type ImportPreviewResult,
   type ImportPreviewReport,
   type ParsedTimesheetRow,
@@ -17,6 +18,7 @@ import {
   type ImportRunSummary,
   type EmployeeOption,
   type ExportRow,
+  type WeeklyExportRow,
 } from "./import-timesheet-logic";
 
 export async function previewTimesheetImport(formData: FormData): Promise<ImportPreviewResult> {
@@ -69,7 +71,8 @@ export async function exportTimesheets(params: {
   employeeIds: string[];
   year: number;
   month: number | null;
-}): Promise<ExportRow[]> {
+  format: "daywise" | "weekly";
+}): Promise<ExportRow[] | WeeklyExportRow[]> {
   await requireRole("TS_ADMIN", "HR_ADMIN");
-  return buildExportRows(params);
+  return params.format === "weekly" ? buildWeeklyExportRows(params) : buildExportRows(params);
 }
