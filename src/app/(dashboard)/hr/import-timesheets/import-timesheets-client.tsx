@@ -32,6 +32,7 @@ import {
   type ImportedRowDetail,
   type EmployeeOption,
   type ExportRow,
+  type WeeklyExportRow,
 } from "./import-timesheet-logic";
 
 const MONTH_NAMES = [
@@ -57,6 +58,9 @@ function downloadExportRows(rows: ExportRow[], label: string) {
   const s = XLSX.utils.json_to_sheet(dataRows.length > 0 ? dataRows : [{ "No data": "No entries found for the selected filters" }]);
   XLSX.utils.book_append_sheet(wb, s, "Timesheet Export");
   XLSX.writeFile(wb, `timesheet_export_${label}.xlsx`);
+}
+function downloadWeeklyExportRows(rows: WeeklyExportRow[], label: string) {
+  const wb = XLSX.utils.book_new(); const data = rows.map((r) => ({ "Employee ID": r.employeeId, "Employee Name": r.employeeName, Client: r.clientName, Project: r.projectName, Task: r.taskName, "Week Starting": r.weekStartDate, "Week Ending": r.weekEndDate, Monday: r.mondayHours, Tuesday: r.tuesdayHours, Wednesday: r.wednesdayHours, Thursday: r.thursdayHours, Friday: r.fridayHours, Saturday: r.saturdayHours, Sunday: r.sundayHours, "Total Hours": r.totalHours, "Timesheet Status": r.timesheetStatus, "Approved By": r.approvedByName ?? "", Comments: r.comments })); const sheet = XLSX.utils.json_to_sheet(data.length ? data : [{ "No data": "No entries found for the selected filters" }]); XLSX.utils.book_append_sheet(wb, sheet, "Weekly Timesheets"); XLSX.writeFile(wb, `timesheet_export_weekly_${label}.xlsx`);
 }
 
 function StatCard({ label, value, tone = "default" }: { label: string; value: number | string; tone?: "default" | "warn" | "good" }) {
@@ -195,6 +199,8 @@ export function ImportTimesheetsClient({
   const [exportEmployeeIds, setExportEmployeeIds] = useState<string[]>([]);
   const [exportYear, setExportYear] = useState<number>(yearRange.maxYear);
   const [exportMonth, setExportMonth] = useState<string>("all");
+  const [exportFormat, setExportFormat] = useState<"daywise" | "weekly">("daywise");
+  const [exportEmployeeSearch, setExportEmployeeSearch] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
@@ -215,11 +221,12 @@ export function ImportTimesheetsClient({
           employeeIds: exportEmployeeIds,
           year: exportYear,
           month: exportMonth === "all" ? null : Number(exportMonth),
+          format: exportFormat,
         });
         const monthLabel = exportMonth === "all" ? "full_year" : MONTH_NAMES[Number(exportMonth) - 1];
         const empLabel = exportEmployeeIds.length === 0 ? "all_employees" : `${exportEmployeeIds.length}_employees`;
-        downloadExportRows(rows, `${exportYear}_${monthLabel}_${empLabel}`);
-        setExportSuccess(`Exported ${rows.length} timesheet entr${rows.length === 1 ? "y" : "ies"}.`);
+        if (exportFormat === "weekly") downloadWeeklyExportRows(rows as WeeklyExportRow[], `${exportYear}_${monthLabel}_${empLabel}`); else downloadExportRows(rows as ExportRow[], `${exportYear}_${monthLabel}_${empLabel}`);
+        setExportSuccess(`Exported ${rows.length} ${exportFormat === "weekly" ? "weekly" : "daily"} timesheet entr${rows.length === 1 ? "y" : "ies"}.`);
       } catch (err) {
         setExportError(err instanceof Error ? err.message : "Failed to export timesheets");
       } finally {
@@ -470,8 +477,9 @@ export function ImportTimesheetsClient({
                     </span>
                   )}
                 </div>
+                <input aria-label="Search employees to export" value={exportEmployeeSearch} onChange={(event) => setExportEmployeeSearch(event.target.value)} placeholder="Search employee name or ID…" className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm" />
                 <div className="border rounded-lg p-3 max-h-56 overflow-y-auto flex flex-col gap-1 bg-gray-50/50">
-                  {employees.map((emp) => {
+                  {employees.filter((emp) => `${emp.name} ${emp.id}`.toLowerCase().includes(exportEmployeeSearch.trim().toLowerCase())).map((emp) => {
                     const isSelected = exportEmployeeIds.includes(emp.id);
                     return (
                       <div key={emp.id} className="flex items-center gap-2 py-0.5">
@@ -491,7 +499,7 @@ export function ImportTimesheetsClient({
                       </div>
                     );
                   })}
-                  {employees.length === 0 && (
+                  {employees.filter((emp) => `${emp.name} ${emp.id}`.toLowerCase().includes(exportEmployeeSearch.trim().toLowerCase())).length === 0 && (
                     <span className="text-xs text-muted-foreground">No employees found.</span>
                   )}
                 </div>
@@ -533,6 +541,7 @@ export function ImportTimesheetsClient({
                   </Select>
                 </div>
               </div>
+              <div className="flex flex-col gap-2"><Label className="font-semibold">Export format</Label><div className="flex gap-2"><Button type="button" variant={exportFormat === "daywise" ? "default" : "outline"} size="sm" onClick={() => setExportFormat("daywise")}>Day-wise</Button><Button type="button" variant={exportFormat === "weekly" ? "default" : "outline"} size="sm" onClick={() => setExportFormat("weekly")}>Week-wise</Button></div><p className="text-xs text-muted-foreground">Week-wise exports one task row per Monday–Sunday period, with daily totals and the weekly total.</p></div>
 
               {exportError && (
                 <div className="text-sm text-red-900 bg-red-50/50 border border-red-200 rounded-lg px-3 py-2">

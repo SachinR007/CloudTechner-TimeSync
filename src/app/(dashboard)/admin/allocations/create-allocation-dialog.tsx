@@ -27,6 +27,7 @@ export function CreateAllocationDialog({
   const [projectId, setProjectId] = useState(fixedProject.id);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [employeePercentages, setEmployeePercentages] = useState<Record<string, string>>({});
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [startDateStr, setStartDateStr] = useState("");
   const [endDateStr, setEndDateStr] = useState("");
 
@@ -34,6 +35,7 @@ export function CreateAllocationDialog({
     setProjectId(fixedProject.id);
     setSelectedEmployeeIds([]);
     setEmployeePercentages({});
+    setEmployeeSearch("");
     setStartDateStr("");
     setEndDateStr("");
     setError(null);
@@ -68,6 +70,11 @@ export function CreateAllocationDialog({
     });
   }
 
+  const visibleEmployees = employees.filter((employee) => {
+    const query = employeeSearch.trim().toLowerCase();
+    return !query || `${employee.name} ${employee.id}`.toLowerCase().includes(query);
+  });
+
   return (
     <Dialog
       open={open}
@@ -77,23 +84,31 @@ export function CreateAllocationDialog({
       }}
     >
       <DialogTrigger render={<Button className="bg-[#0B3B45] hover:bg-[#123B2A] text-white" />}>New Allocation</DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Allocate employees to {fixedProject.name}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
             Project: <span className="font-semibold text-foreground">{fixedProject.code ? `${fixedProject.name} (${fixedProject.code})` : fixedProject.name}</span>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label className="font-semibold mb-1">Employees &amp; Allocation % *</Label>
-            <div className="border rounded-lg p-3 max-h-48 overflow-y-auto flex flex-col gap-2 bg-gray-50/50">
-              {employees.map((e) => {
+            <Input
+              type="search"
+              value={employeeSearch}
+              onChange={(event) => setEmployeeSearch(event.target.value)}
+              placeholder="Search by employee name or ID..."
+              aria-label="Search employees to allocate"
+              className="h-9"
+            />
+            <div className="max-h-48 overflow-y-auto rounded-lg border bg-gray-50/50 p-3">
+              {visibleEmployees.map((e) => {
                 const isSelected = selectedEmployeeIds.includes(e.id);
                 const pct = employeePercentages[e.id] ?? "100";
                 return (
-                  <div key={e.id} className="flex items-center justify-between gap-2 py-1 border-b last:border-0 border-gray-100">
+                  <div key={e.id} className="flex items-center justify-between gap-2 border-b border-gray-100 py-2 last:border-0">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -134,11 +149,12 @@ export function CreateAllocationDialog({
                   </div>
                 );
               })}
+              {visibleEmployees.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No employees match this search.</p>}
             </div>
             <p className="text-[10px] text-muted-foreground">Select one or more employees. Default is 100% allocation (5% steps).</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="startDate">Start Date *</Label>
               <Input
@@ -161,7 +177,7 @@ export function CreateAllocationDialog({
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="mt-2 flex shrink-0 justify-end gap-2 border-t pt-3">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
               Cancel
             </Button>

@@ -9,6 +9,8 @@ export type AllocationReportExportRow = {
   Client: string;
   Project: string;
   "Allocation %": number;
+  "Working hours": number;
+  "Missed timesheet reminders": number;
   "Start date": string;
   "End date": string;
   Status: string;
@@ -18,8 +20,8 @@ export function AllocationReportExport({ rows }: { rows: AllocationReportExportR
   function downloadReport() {
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet["!cols"] = [
-      { wch: 28 }, { wch: 28 }, { wch: 32 }, { wch: 14 },
-      { wch: 14 }, { wch: 14 }, { wch: 16 },
+      { wch: 28 }, { wch: 28 }, { wch: 32 }, { wch: 14 }, { wch: 16 },
+      { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Allocation report");

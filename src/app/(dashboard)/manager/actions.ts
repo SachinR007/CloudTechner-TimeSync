@@ -62,6 +62,36 @@ export async function approveProjectApproval(approvalId: string) {
   revalidatePath("/hr");
 }
 
+/** Approve a deliberately selected set of still-pending project slices atomically. */
+export async function approveProjectApprovals(approvalIds: string[]) {
+  const manager = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");
+  if (!Array.isArray(approvalIds) || approvalIds.length === 0 || approvalIds.length > 100) {
+    throw new Error("Select between 1 and 100 pending timesheets to approve.");
+  }
+  const ids = [...new Set(approvalIds.map((id) => validateRecordId(id, "Approval")))];
+  const approvals = await prisma.timesheetApproval.findMany({
+    where: { id: { in: ids } },
+    include: { timesheetHeader: { select: { id: true, employeeId: true, isLate: true, lateApproved: true } } },
+  });
+  if (approvals.length !== ids.length) throw new Error("One or more selected approvals no longer exist.");
+  for (const approval of approvals) {
+    if (approval.approverId !== manager.id || approval.timesheetHeader.employeeId === manager.id ||
+      (approval.timesheetHeader.isLate && !approval.timesheetHeader.lateApproved) || approval.status !== "PENDING") {
+      throw new Error("One or more selected approvals are no longer eligible. Refresh and try again.");
+    }
+  }
+  await prisma.$transaction(async (tx) => {
+    const now = new Date();
+    for (const approval of approvals) {
+      await tx.timesheetApproval.update({ where: { id: approval.id }, data: { status: "APPROVED", approvedAt: now } });
+      await tx.approvalHistory.create({ data: { timesheetHeaderId: approval.timesheetHeader.id, actorId: manager.id, action: "APPROVED", comments: "Project slice approved in bulk" } });
+      await rollupHeaderStatus(tx, approval.timesheetHeader.id);
+    }
+  });
+  revalidatePath("/manager"); revalidatePath("/employee"); revalidatePath("/hr");
+  return { approvedCount: approvals.length };
+}
+
 // Reject one project's slice (rejects the whole week back to the employee).
 export async function rejectProjectApproval(approvalId: string, comments: string) {
   const manager = await requireRole("EMPLOYEE", "PROJECT_MANAGER", "HR_ADMIN", "TS_ADMIN");

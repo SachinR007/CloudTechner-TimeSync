@@ -21,6 +21,8 @@ export type EmployeeAllocationSummary = {
   currentAllocations: Allocation[];
   previousAllocations: Allocation[];
   utilization: number;
+  workingHours: number;
+  missedTimesheets: number;
 };
 
 function AllocationCard({ allocation }: { allocation: Allocation }) {
@@ -58,6 +60,8 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
               <th className="px-3 py-3">Employee</th>
               <th className="px-3 py-3">Active allocations</th>
               <th className="px-3 py-3 text-right">Utilization</th>
+              <th className="px-3 py-3 text-right">Working hours</th>
+              <th className="px-3 py-3 text-right">Missed reminders</th>
               <th className="px-3 py-3 text-right">History</th>
             </tr>
           </thead>
@@ -80,6 +84,8 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                     <td className={`px-3 py-4 text-right font-bold ${employee.utilization > 100 ? "text-rose-600" : "text-gray-800"}`}>
                       {employee.utilization}%
                     </td>
+                    <td className="px-3 py-4 text-right font-medium text-gray-800">{employee.workingHours} h</td>
+                    <td className="px-3 py-4 text-right font-medium text-gray-800">{employee.missedTimesheets}</td>
                     <td className="px-3 py-4 text-right">
                       <Button type="button" variant="outline" size="sm" onClick={() => setExpandedEmployeeId(expanded ? null : employee.id)}>
                         {expanded ? <ChevronDown /> : <ChevronRight />}
@@ -89,7 +95,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                   </tr>
                   {expanded && (
                     <tr className="bg-muted/20">
-                      <td colSpan={4} className="px-6 py-4">
+                      <td colSpan={6} className="px-6 py-4">
                         <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><ChevronRight className="size-4" /> Previous allocations</div>
                         {employee.previousAllocations.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No previous project allocations.</p>
@@ -104,7 +110,7 @@ export function EmployeeAllocationSummaryTable({ employees }: { employees: Emplo
                 </Fragment>
               );
             })}
-            {employees.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No employees or allocations found.</td></tr>}
+            {employees.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No employees or allocations found.</td></tr>}
           </tbody>
         </table>
       </CardContent>

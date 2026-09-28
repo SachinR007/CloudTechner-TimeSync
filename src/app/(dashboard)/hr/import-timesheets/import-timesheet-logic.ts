@@ -607,6 +607,7 @@ export type ExportRow = {
   timesheetStatus: string;
   approvedByName: string | null;
 };
+export type WeeklyExportRow = Omit<ExportRow, "workDate" | "hours" | "notes"> & { weekEndDate: string; mondayHours: number; tuesdayHours: number; wednesdayHours: number; thursdayHours: number; fridayHours: number; saturdayHours: number; sundayHours: number; totalHours: number; comments: string };
 
 // Read-only -- exports existing TimesheetLine data for the given employees
 // (empty array = all employees) and month/year (month = null means the whole
@@ -655,4 +656,11 @@ export async function buildExportRows(params: {
       approvedByName: l.timesheetHeader.approvedBy?.name ?? null,
     }))
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName) || a.workDate.localeCompare(b.workDate));
+}
+
+export async function buildWeeklyExportRows(params: { employeeIds: string[]; year: number; month: number | null }): Promise<WeeklyExportRow[]> {
+  const rows = await buildExportRows(params); const grouped = new Map<string, WeeklyExportRow>();
+  for (const row of rows) { const key = [row.employeeId, row.weekStartDate, row.projectName, row.taskName].join("|"); let weekly = grouped.get(key); if (!weekly) { weekly = { employeeId: row.employeeId, employeeName: row.employeeName, clientName: row.clientName, projectName: row.projectName, taskName: row.taskName, weekStartDate: row.weekStartDate, weekEndDate: toISODate(new Date(new Date(`${row.weekStartDate}T00:00:00.000Z`).getTime() + 6 * 86400000)), mondayHours: 0, tuesdayHours: 0, wednesdayHours: 0, thursdayHours: 0, fridayHours: 0, saturdayHours: 0, sundayHours: 0, totalHours: 0, comments: "", timesheetStatus: row.timesheetStatus, approvedByName: row.approvedByName }; grouped.set(key, weekly); }
+    const day = new Date(`${row.workDate}T00:00:00.000Z`).getUTCDay(); const field = (["sundayHours", "mondayHours", "tuesdayHours", "wednesdayHours", "thursdayHours", "fridayHours", "saturdayHours"] as const)[day]; weekly[field] += row.hours; weekly.totalHours += row.hours; if (row.notes) weekly.comments += `${weekly.comments ? " | " : ""}${row.workDate}: ${row.notes}`;
+  } return [...grouped.values()].sort((a, b) => a.employeeName.localeCompare(b.employeeName) || a.weekStartDate.localeCompare(b.weekStartDate) || a.projectName.localeCompare(b.projectName) || a.taskName.localeCompare(b.taskName));
 }

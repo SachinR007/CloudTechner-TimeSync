@@ -100,6 +100,7 @@ export function HolidaysClient({
 
   // Assignment checkbox state
   const [assignedEmpIds, setAssignedEmpIds] = useState<string[]>([]);
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = useState("");
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
@@ -113,6 +114,11 @@ export function HolidaysClient({
   const filteredPlans = plans.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const assignmentEmployees = allEmployees.filter((employee) => {
+    const query = assignmentSearchQuery.trim().toLowerCase();
+    return !query || `${employee.name} ${employee.email} ${employee.id}`.toLowerCase().includes(query);
+  });
 
   // Filter holidays of selected plan by selected year
   const activeHolidays = selectedPlan
@@ -235,6 +241,7 @@ export function HolidaysClient({
     if (!selectedPlan) return;
     const currentIds = selectedPlan.employees.map(e => e.id);
     setAssignedEmpIds(currentIds);
+    setAssignmentSearchQuery("");
     setWarningMessage(null);
     setIsAssignOpen(true);
   };
@@ -842,8 +849,8 @@ export function HolidaysClient({
 
       {/* ASSIGN EMPLOYEES MODAL */}
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-        <DialogContent className="max-w-lg bg-white flex flex-col h-[520px]">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden bg-white sm:max-w-lg">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-1.5">
               <Users className="h-5 w-5 text-purple-700" />
               Manage Plan Assignment
@@ -861,8 +868,20 @@ export function HolidaysClient({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto my-3 border border-gray-150 rounded-lg p-2 bg-gray-50/20 flex flex-col gap-1">
-            {allEmployees.map((emp) => {
+          <div className="relative shrink-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+            <Input
+              type="search"
+              value={assignmentSearchQuery}
+              onChange={(event) => setAssignmentSearchQuery(event.target.value)}
+              placeholder="Search employees by name, email, or ID..."
+              aria-label="Search holiday plan employees"
+              className="h-9 pl-9 text-xs"
+            />
+          </div>
+
+          <div className="my-3 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-lg border border-gray-150 bg-gray-50/20 p-2">
+            {assignmentEmployees.map((emp) => {
               const isChecked = assignedEmpIds.includes(emp.id);
               // Find other plans if assigned elsewhere
               const otherPlan = emp.holidayPlanId && emp.holidayPlanId !== selectedPlanId
@@ -905,9 +924,10 @@ export function HolidaysClient({
                 </div>
               );
             })}
+            {assignmentEmployees.length === 0 && <p className="py-8 text-center text-sm text-gray-500">No employees match this search.</p>}
           </div>
 
-          <DialogFooter className="border-t border-gray-50 pt-3 flex gap-2 justify-end">
+          <DialogFooter className="shrink-0 border-t border-gray-50 pt-3 flex gap-2 justify-end">
             <Button
               type="button"
               variant="outline"

@@ -15,6 +15,7 @@ import {
 import { ToggleActiveButton } from "@/components/toggle-active-button";
 import { EditEmployeeDialog } from "./edit-employee-dialog";
 import { toggleEmployeeActive, toggleEmployeeTimesheetAccess } from "./actions";
+import { filterByActivity, type ActivityFilter } from "@/lib/management-reporting";
 
 type EmployeeItem = {
   id: string;
@@ -52,6 +53,12 @@ const tabs = [
 
 type EmployeeTab = (typeof tabs)[number]["id"];
 
+const activityTabs: { id: ActivityFilter; label: string }[] = [
+  { id: "all", label: "All status" },
+  { id: "active", label: "Active" },
+  { id: "inactive", label: "Inactive" },
+];
+
 function getCategory(title: string | null, role: string) {
   const normalizedTitle = (title || "").toLowerCase();
   const normalizedRole = role.toLowerCase();
@@ -70,9 +77,10 @@ function initialsFor(name: string) {
 
 export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeListProps) {
   const [selectedTab, setSelectedTab] = useState<EmployeeTab>("ALL");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredEmployees = initialEmployees.filter((employee) => {
+  const filteredEmployees = filterByActivity(initialEmployees, activityFilter).filter((employee) => {
     if (selectedTab !== "ALL" && getCategory(employee.title, employee.role) !== selectedTab) return false;
 
     const query = searchQuery.trim().toLowerCase();
@@ -98,20 +106,36 @@ export function EmployeeList({ initialEmployees, allActiveEmployees }: EmployeeL
     return initialEmployees.filter((employee) => getCategory(employee.title, employee.role) === tab).length;
   };
 
+  const getActivityCount = (filter: ActivityFilter) => filterByActivity(initialEmployees, filter).length;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 border-b border-gray-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSelectedTab(tab.id)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${selectedTab === tab.id ? "bg-emerald-850 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-            >
-              {tab.label} ({getTabCount(tab.id)})
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5" aria-label="Filter employees by status">
+            {activityTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActivityFilter(tab.id)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${activityFilter === tab.id ? "bg-emerald-700 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              >
+                {tab.label} ({getActivityCount(tab.id)})
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5" aria-label="Filter employees by department">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSelectedTab(tab.id)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${selectedTab === tab.id ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              >
+                {tab.label} ({getTabCount(tab.id)})
+              </button>
+            ))}
+          </div>
         </div>
 
         <label className="relative w-full sm:w-72">

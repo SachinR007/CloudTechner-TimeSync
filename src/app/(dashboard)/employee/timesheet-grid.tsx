@@ -45,6 +45,7 @@ type Task = {
 
 export function TimesheetGrid({
   weekStartISO,
+  focusDateISO,
   dates,
   tasks,
   initialHours,
@@ -54,6 +55,7 @@ export function TimesheetGrid({
   holidayDates = {},
 }: {
   weekStartISO: string;
+  focusDateISO: string;
   dates: string[];
   tasks: Task[];
   initialHours: Record<string, number>;
@@ -351,7 +353,7 @@ export function TimesheetGrid({
             <TableRow className="bg-gray-50/50">
               <TableHead className="min-w-48 font-bold text-gray-700">Client / Project / Task</TableHead>
               {dates.map((date, i) => (
-                <TableHead key={date} className="text-center font-bold text-gray-700">
+                <TableHead key={date} className={`text-center font-bold text-gray-700 ${date === focusDateISO ? "bg-emerald-50 text-emerald-900" : ""}`}>
                   {WEEKDAY_LABELS[i]}
                   <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
                     {formatDisplayDate(date)}
@@ -461,7 +463,7 @@ export function TimesheetGrid({
                                     : isWeeklyOff
                                     ? "bg-slate-100/50"
                                     : ""
-                                }`}
+                                } ${date === focusDateISO ? "ring-1 ring-inset ring-emerald-300 bg-emerald-50/30" : ""}`}
                               >
                                 <div className="flex flex-col gap-1 items-center min-h-[50px] justify-center">
                                   {leaveType ? (

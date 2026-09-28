@@ -22,7 +22,7 @@ async function sendReminderOnce() {
   const sent = new Set(existing.map((notification) => `${notification.employeeId}:${notification.message}`));
   const creates = [];
   if (!sent.has(`${employeeId}:${employeeMessage}`)) creates.push(prisma.notification.create({ data: { employeeId, message: employeeMessage } }));
-  if (!sent.has(`${managerId}:${managerMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: managerId, message: managerMessage } }));
+  if (!sent.has(`${managerId}:${managerMessage}`)) creates.push(prisma.notification.create({ data: { employeeId: managerId, message: managerMessage, kind: "MISSED_TIMESHEET", subjectEmployeeId: employeeId } }));
   await prisma.$transaction(creates);
 }
 
@@ -33,10 +33,12 @@ async function main() {
 
     await sendReminderOnce();
     await sendReminderOnce();
-    const unread = await prisma.notification.findMany({ where: { message: { startsWith: tag }, isRead: false }, select: { employeeId: true, message: true } });
+    const unread = await prisma.notification.findMany({ where: { message: { startsWith: tag }, isRead: false }, select: { employeeId: true, message: true, kind: true, subjectEmployeeId: true } });
     assert(unread.length === 2, "duplicate reminder was created");
     assert(unread.some((notification) => notification.employeeId === employeeId && notification.message === employeeMessage), "employee reminder missing");
     assert(unread.some((notification) => notification.employeeId === managerId && notification.message === managerMessage), "reporting-manager reminder missing");
+    assert(unread.some((notification) => notification.employeeId === employeeId && notification.kind === "GENERAL"), "employee reminder should remain personal");
+    assert(unread.some((notification) => notification.employeeId === managerId && notification.kind === "MISSED_TIMESHEET" && notification.subjectEmployeeId === employeeId), "manager reminder metadata was not stored");
 
     const employeeBell = await prisma.notification.findMany({ where: { employeeId, isRead: false } });
     const managerBell = await prisma.notification.findMany({ where: { employeeId: managerId, isRead: false } });

@@ -39,6 +39,7 @@ type HistoryAllocation = {
 export function EmployeeTabs({
   // Timesheet View Props
   weekStartISO,
+  focusDateISO,
   dates,
   tasks,
   initialHours,
@@ -68,6 +69,7 @@ export function EmployeeTabs({
   notifications = [],
 }: {
   weekStartISO: string;
+  focusDateISO: string;
   dates: string[];
   tasks: any[];
   initialHours: Record<string, number>;
@@ -331,6 +333,7 @@ export function EmployeeTabs({
           <TimesheetGrid
             key={weekStartISO}
             weekStartISO={weekStartISO}
+            focusDateISO={focusDateISO}
             dates={dates}
             tasks={tasks}
             initialHours={initialHours}

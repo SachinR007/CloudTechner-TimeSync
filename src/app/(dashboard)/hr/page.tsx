@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LateSubmissionsCard } from "./late-submissions-card";
 import { NotifyButton } from "./notify-button";
+import { MissingTimesheetReminders } from "./missing-timesheet-reminders";
 import { employeeSafeSelect } from "@/lib/safe-selects";
 import { HR_ACCESS_ROLES } from "@/lib/roles";
 
@@ -222,6 +223,15 @@ export default async function HrDashboard({
       </div>
 
       <LateSubmissionsCard items={serializedLateSubmissions} />
+
+      {rows.some((row) => !row.prevWeekSubmitted) && (
+        <Card className="border border-emerald-200 bg-emerald-50/30 shadow-sm">
+          <CardHeader className="pb-2"><CardTitle className="text-base">Previous-week reminders</CardTitle></CardHeader>
+          <CardContent>
+            <MissingTimesheetReminders rows={rows.map((row) => ({ id: row.employee.id, name: row.employee.name, role: row.employee.role === "PROJECT_MANAGER" ? "Project Manager" : "Employee", totalHours: row.totalHours, statusLabel: STATUS_CONFIG[row.status].label, canNotify: !row.prevWeekSubmitted, weekStartISO: row.prevWeekISO }))} />
+          </CardContent>
+        </Card>
+      )}
 
 
 
