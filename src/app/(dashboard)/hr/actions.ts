@@ -54,6 +54,72 @@ export async function approveLateSubmission(timesheetHeaderId: string) {
   revalidatePath("/employee");
 }
 
+export async function approveLateSubmissions(timesheetHeaderIds: string[]) {
+  const user = await requireRole(...HR_ACCESS_ROLES);
+  if (!Array.isArray(timesheetHeaderIds) || timesheetHeaderIds.length === 0) {
+    throw new Error("Select at least one late submission to approve.");
+  }
+  if (timesheetHeaderIds.length > 100) {
+    throw new Error("Approve no more than 100 late submissions at a time.");
+  }
+
+  const safeHeaderIds = Array.from(
+    new Set(
+      timesheetHeaderIds.map((id) => {
+        if (typeof id !== "string") throw new Error("Invalid timesheet selection.");
+        return validateRecordId(id, "Timesheet");
+      })
+    )
+  );
+  const actorLabel = user.role === "TS_ADMIN" ? "Timesheet Admin" : "HR Admin";
+
+  await prisma.$transaction(async (tx) => {
+    const timesheets = await tx.timesheetHeader.findMany({
+      where: { id: { in: safeHeaderIds } },
+      select: { id: true, isLate: true, lateApproved: true, status: true },
+    });
+    if (timesheets.length !== safeHeaderIds.length) {
+      throw new Error("One or more selected timesheets no longer exist.");
+    }
+    if (timesheets.some((timesheet) => !timesheet.isLate || timesheet.lateApproved || timesheet.status !== "SUBMITTED")) {
+      throw new Error("One or more selected timesheets have already been processed. Refresh and try again.");
+    }
+
+    const projectApprovals = await tx.timesheetApproval.findMany({
+      where: { timesheetHeaderId: { in: safeHeaderIds } },
+      select: { timesheetHeaderId: true, status: true },
+    });
+    const statusesByHeader = new Map<string, string[]>();
+    for (const approval of projectApprovals) {
+      const statuses = statusesByHeader.get(approval.timesheetHeaderId) ?? [];
+      statuses.push(approval.status);
+      statusesByHeader.set(approval.timesheetHeaderId, statuses);
+    }
+
+    const approvedAt = new Date();
+    for (const timesheet of timesheets) {
+      const statuses = statusesByHeader.get(timesheet.id) ?? [];
+      const allProjectSlicesApproved = statuses.length > 0 && statuses.every((status) => status === "APPROVED");
+      await tx.timesheetHeader.update({
+        where: { id: timesheet.id },
+        data: { lateApproved: true, ...(allProjectSlicesApproved ? { status: "APPROVED", approvedAt } : {}) },
+      });
+    }
+
+    await tx.approvalHistory.createMany({
+      data: safeHeaderIds.map((timesheetHeaderId) => ({
+        timesheetHeaderId,
+        actorId: user.id,
+        action: "LATE_APPROVED",
+        comments: `Late submission approved by ${actorLabel} (${user.name})`,
+      })),
+    });
+  });
+
+  revalidatePath("/hr");
+  revalidatePath("/employee");
+}
+
 export async function rejectLateSubmission(timesheetHeaderId: string, comments: string) {
   const user = await requireRole(...HR_ACCESS_ROLES);
   const safeHeaderId = validateRecordId(timesheetHeaderId, "Timesheet");

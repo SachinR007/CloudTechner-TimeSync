@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import {
 import * as XLSX from "@e965/xlsx";
 import { Search, Calendar, Plus, FileSpreadsheet, Trash2, Users, Check, AlertTriangle, Briefcase, HelpCircle } from "lucide-react";
 import Link from "next/link";
+import { captureDashboardScroll, restoreDashboardScroll } from "@/lib/dashboard-scroll";
 
 type Holiday = {
   id: string;
@@ -69,12 +71,15 @@ export function HolidaysClient({
   initialPlans: HolidayPlan[];
   allEmployees: EmployeeShort[];
 }) {
-  const [activeTab, setActiveTab] = useState<"calendars" | "unallocated">("calendars");
-  const [plans, setPlans] = useState<HolidayPlan[]>(initialPlans);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(
-    initialPlans.find(p => p.isDefault)?.id || initialPlans[0]?.id || ""
-  );
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const defaultPlanId = initialPlans.find((plan) => plan.isDefault)?.id || initialPlans[0]?.id || "";
+  const planFromUrl = searchParams.get("plan");
+  const selectedPlanId = initialPlans.some((plan) => plan.id === planFromUrl) ? planFromUrl! : defaultPlanId;
+  const yearFromUrl = Number(searchParams.get("year"));
+  const selectedYear = Number.isInteger(yearFromUrl) && yearFromUrl >= 2000 && yearFromUrl <= 2100 ? yearFromUrl : 2026;
+  const activeTab: "calendars" | "unallocated" = searchParams.get("tab") === "unallocated" ? "unallocated" : "calendars";
   const [searchQuery, setSearchQuery] = useState("");
   const [unallocatedSearchQuery, setUnallocatedSearchQuery] = useState("");
   
@@ -103,7 +108,7 @@ export function HolidaysClient({
   const [assignmentSearchQuery, setAssignmentSearchQuery] = useState("");
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
-  const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const selectedPlan = initialPlans.find(p => p.id === selectedPlanId);
   const selectedPlanEmployees = selectedPlan
     ? selectedPlan.isDefault
       ? allEmployees.filter((employee) => !employee.holidayPlanId || employee.holidayPlanId === selectedPlan.id)
@@ -111,7 +116,7 @@ export function HolidaysClient({
     : [];
 
   // Search filter plans
-  const filteredPlans = plans.filter(p =>
+  const filteredPlans = initialPlans.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -134,6 +139,23 @@ export function HolidaysClient({
     emp.name.toLowerCase().includes(unallocatedSearchQuery.toLowerCase()) ||
     emp.email.toLowerCase().includes(unallocatedSearchQuery.toLowerCase())
   );
+
+  function updateViewState(updates: { plan?: string; year?: number; tab?: "calendars" | "unallocated" }) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (updates.plan !== undefined) params.set("plan", updates.plan);
+    if (updates.year !== undefined) params.set("year", String(updates.year));
+    if (updates.tab !== undefined) {
+      if (updates.tab === "unallocated") params.set("tab", updates.tab);
+      else params.delete("tab");
+    }
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
+  }
+
+  function refreshHolidayData(scrollPosition: number) {
+    router.refresh();
+    restoreDashboardScroll(scrollPosition);
+  }
 
   // Exporter for template
   const downloadTemplate = () => {
@@ -161,13 +183,15 @@ export function HolidaysClient({
     formData.append("holidayPlanId", selectedPlanId);
     // Allow the same spreadsheet to be selected again for another plan.
     e.currentTarget.value = "";
+    const scrollPosition = captureDashboardScroll();
 
     startTransition(async () => {
       try {
         const res = await importHolidaysExcel(formData);
         setUploadSuccess(`Successfully imported ${res.count} holidays!`);
-        window.location.reload();
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         setUploadError(err instanceof Error ? err.message : "Failed to import file");
       }
     });
@@ -182,6 +206,7 @@ export function HolidaysClient({
       return;
     }
 
+    const scrollPosition = captureDashboardScroll();
     startTransition(async () => {
       try {
         await addHolidayManual(
@@ -196,8 +221,9 @@ export function HolidaysClient({
         setManualDate("");
         setManualIsFloater(false);
         setManualIsSpecial(false);
-        window.location.reload();
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         setManualError(err instanceof Error ? err.message : "Failed to add holiday");
       }
     });
@@ -205,12 +231,14 @@ export function HolidaysClient({
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this holiday?")) return;
+    const scrollPosition = captureDashboardScroll();
 
     startTransition(async () => {
       try {
         await deleteHoliday(id);
-        window.location.reload();
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         alert(err instanceof Error ? err.message : "Failed to delete holiday");
       }
     });
@@ -224,14 +252,16 @@ export function HolidaysClient({
       return;
     }
 
+    const scrollPosition = captureDashboardScroll();
     startTransition(async () => {
       try {
         const plan = await createHolidayPlan(newPlanName);
         setIsNewPlanOpen(false);
         setNewPlanName("");
-        setSelectedPlanId(plan.id);
-        window.location.reload();
+        updateViewState({ plan: plan.id });
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         setNewPlanError(err instanceof Error ? err.message : "Failed to create plan");
       }
     });
@@ -247,23 +277,27 @@ export function HolidaysClient({
   };
 
   const handleSaveAssignments = () => {
+    const scrollPosition = captureDashboardScroll();
     startTransition(async () => {
       try {
         await assignEmployeesToPlan(selectedPlanId, assignedEmpIds);
         setIsAssignOpen(false);
-        window.location.reload();
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         alert(err instanceof Error ? err.message : "Failed to save assignments");
       }
     });
   };
 
   const handleRemoveEmployee = (employeeId: string) => {
+    const scrollPosition = captureDashboardScroll();
     startTransition(async () => {
       try {
         await removeEmployeesFromPlan(selectedPlanId, [employeeId]);
-        window.location.reload();
+        refreshHolidayData(scrollPosition);
       } catch (err) {
+        restoreDashboardScroll(scrollPosition);
         alert(err instanceof Error ? err.message : "Failed to move employee to the Default calendar");
       }
     });
@@ -275,7 +309,7 @@ export function HolidaysClient({
 
     // If adding, and the employee is already assigned to a DIFFERENT non-default plan, raise a warning!
     if (isAdding && emp && emp.holidayPlanId && emp.holidayPlanId !== selectedPlanId) {
-      const currentPlan = plans.find(p => p.id === emp.holidayPlanId);
+      const currentPlan = initialPlans.find((plan) => plan.id === emp.holidayPlanId);
       if (currentPlan && !currentPlan.isDefault) {
         setWarningMessage(
           `⚠️ Notice: ${emp.name} is currently assigned to the "${currentPlan.name}" holiday plan. Re-assigning will move them to "${selectedPlan?.name}".`
@@ -315,7 +349,7 @@ export function HolidaysClient({
       {/* Tabs Selector */}
       <div className="flex border-b border-gray-200">
         <button
-          onClick={() => setActiveTab("calendars")}
+          onClick={() => updateViewState({ tab: "calendars" })}
           className={`px-6 py-2.5 font-bold text-sm border-b-2 transition-all ${
             activeTab === "calendars"
               ? "border-purple-700 text-purple-700"
@@ -325,7 +359,7 @@ export function HolidaysClient({
           Holiday Plans & Rosters
         </button>
         <button
-          onClick={() => setActiveTab("unallocated")}
+          onClick={() => updateViewState({ tab: "unallocated" })}
           className={`px-6 py-2.5 font-bold text-sm border-b-2 transition-all flex items-center gap-1.5 ${
             activeTab === "unallocated"
               ? "border-purple-700 text-purple-700"
@@ -364,7 +398,7 @@ export function HolidaysClient({
                 return (
                   <button
                     key={p.id}
-                    onClick={() => setSelectedPlanId(p.id)}
+                    onClick={() => updateViewState({ plan: p.id })}
                     className={`w-full text-left p-3 rounded-lg flex items-center justify-between transition-all select-none ${
                       isActive
                         ? "bg-purple-50/80 text-purple-900 border border-purple-200"
@@ -454,7 +488,7 @@ export function HolidaysClient({
                     return (
                       <button
                         key={yr}
-                        onClick={() => setSelectedYear(yr)}
+                        onClick={() => updateViewState({ year: yr })}
                         className={`px-3 py-1 rounded text-xs font-bold transition-all border ${
                           isYrActive
                             ? "bg-purple-800 text-white border-purple-800 shadow-sm"
@@ -664,7 +698,7 @@ export function HolidaysClient({
                 </TableHeader>
                 <TableBody>
                   {unallocatedEmployees.map((emp) => {
-                    const currentPlanName = plans.find(p => p.id === emp.holidayPlanId)?.name || "Default (Company-wide)";
+                    const currentPlanName = initialPlans.find((plan) => plan.id === emp.holidayPlanId)?.name || "Default (Company-wide)";
                     return (
                       <TableRow key={emp.id} className="hover:bg-gray-50/30">
                         <TableCell className="pl-6 py-4">
@@ -885,7 +919,7 @@ export function HolidaysClient({
               const isChecked = assignedEmpIds.includes(emp.id);
               // Find other plans if assigned elsewhere
               const otherPlan = emp.holidayPlanId && emp.holidayPlanId !== selectedPlanId
-                ? plans.find(p => p.id === emp.holidayPlanId)
+                ? initialPlans.find((plan) => plan.id === emp.holidayPlanId)
                 : null;
               
               // Only flag warning if it's not the Default plan

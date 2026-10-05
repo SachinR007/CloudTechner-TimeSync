@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition, useState } from "react";
-import { approveLateSubmission, rejectLateSubmission } from "./actions";
+import { useEffect, useState, useTransition } from "react";
+import { approveLateSubmissions, rejectLateSubmission } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -39,19 +40,45 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
   const [isPending, startTransition] = useTransition();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectComment, setRejectComment] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [approvingIds, setApprovingIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    const availableIds = new Set(items.map((item) => item.id));
+    setSelectedIds((current) => current.filter((id) => availableIds.has(id)));
+  }, [items]);
 
   if (items.length === 0) return null;
 
-  function handleApprove(id: string) {
-    if (confirm("Are you sure you want to approve this late submission? This will allow the timesheet to be routed to their manager for final review.")) {
-      startTransition(async () => {
-        try {
-          await approveLateSubmission(id);
-        } catch (e) {
-          alert(e instanceof Error ? e.message : "Failed to approve late submission");
-        }
-      });
-    }
+  function requestApproval(ids: string[]) {
+    if (ids.length > 0) setApprovingIds(ids);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
+    );
+  }
+
+  function toggleAll() {
+    setSelectedIds((current) => (current.length === items.length ? [] : items.map((item) => item.id)));
+  }
+
+  function handleBulkApprove() {
+    requestApproval(selectedIds);
+  }
+
+  function confirmApproval() {
+    if (!approvingIds?.length) return;
+    startTransition(async () => {
+      try {
+        await approveLateSubmissions(approvingIds);
+        setSelectedIds([]);
+        setApprovingIds(null);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Failed to approve late submission(s)");
+      }
+    });
   }
 
   function handleRejectSubmit() {
@@ -84,12 +111,30 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
               These timesheets are more than 2 weeks overdue and require HR authorization to proceed.
             </p>
           </div>
+          <Button
+            size="sm"
+            disabled={isPending || selectedIds.length === 0}
+            onClick={handleBulkApprove}
+            className="h-8 shrink-0 bg-emerald-700 text-white hover:bg-emerald-800"
+          >
+            {isPending ? "Approving..." : `Approve selected${selectedIds.length ? ` (${selectedIds.length})` : ""}`}
+          </Button>
         </CardHeader>
         <CardContent className="p-0 bg-white">
           <Table>
             <TableHeader className="bg-red-50/5">
               <TableRow className="border-b border-red-100 hover:bg-transparent">
-                <TableHead className="pl-6 font-semibold text-red-900">Employee</TableHead>
+                <TableHead className="w-14 px-3 text-center">
+                  <input
+                    aria-label="Select all late submissions"
+                    type="checkbox"
+                    checked={selectedIds.length === items.length}
+                    onChange={toggleAll}
+                    disabled={isPending}
+                    className="size-4 cursor-pointer rounded border-gray-300 accent-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40 disabled:cursor-not-allowed"
+                  />
+                </TableHead>
+                <TableHead className="pl-2 font-semibold text-red-900">Employee</TableHead>
                 <TableHead className="font-semibold text-red-900">Overdue Week</TableHead>
                 <TableHead className="font-semibold text-red-900 text-center">Total Hours</TableHead>
                 <TableHead className="font-semibold text-red-900">Submitted On</TableHead>
@@ -106,7 +151,17 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
 
                 return (
                   <TableRow key={item.id} className="border-b border-red-50 hover:bg-red-50/5 transition-colors">
-                    <TableCell className="pl-6 py-3.5">
+                    <TableCell className="w-14 px-3 py-3.5 text-center align-middle">
+                      <input
+                        aria-label={`Select ${item.employee.name}'s late submission`}
+                        type="checkbox"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => toggleSelected(item.id)}
+                        disabled={isPending}
+                        className="size-4 cursor-pointer rounded border-gray-300 accent-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40 disabled:cursor-not-allowed"
+                      />
+                    </TableCell>
+                    <TableCell className="pl-2 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 border border-red-200 text-xs font-semibold text-red-700">
                           {initials}
@@ -132,7 +187,7 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
                           size="sm"
                           variant="outline"
                           disabled={isPending}
-                          onClick={() => handleApprove(item.id)}
+                          onClick={() => requestApproval([item.id])}
                           className="h-8 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
                         >
                           Approve
@@ -155,6 +210,27 @@ export function LateSubmissionsCard({ items }: { items: LateTimesheet[] }) {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={approvingIds !== null} onOpenChange={(open) => !open && setApprovingIds(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-emerald-900 font-bold">
+              Approve {approvingIds?.length === 1 ? "Late Submission" : "Late Submissions"}
+            </DialogTitle>
+            <DialogDescription>
+              {approvingIds?.length === 1
+                ? "This timesheet will be released to the manager for final review."
+                : `${approvingIds?.length ?? 0} timesheets will be released to their managers for final review.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={isPending} onClick={() => setApprovingIds(null)}>Cancel</Button>
+            <Button disabled={isPending} onClick={confirmApproval} className="bg-emerald-700 text-white hover:bg-emerald-800">
+              {isPending ? "Approving..." : "Confirm approval"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={rejectingId !== null} onOpenChange={(open) => !open && setRejectingId(null)}>
         <DialogContent className="sm:max-w-[425px]">
