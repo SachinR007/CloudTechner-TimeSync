@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/prisma";
-import { formatDisplayDate, toISODate, weekDates } from "@/lib/dates";
+import { addDays, formatDisplayDate, toISODate, weekDates } from "@/lib/dates";
+import { reviewHolidaysForWeek } from "@/lib/review-holidays";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,14 +51,14 @@ export default async function ManagerDashboard({
   else if (sort === "week_desc") orderByClause = { timesheetHeader: { weekStartDate: "desc" } };
   else if (sort === "week_asc") orderByClause = { timesheetHeader: { weekStartDate: "asc" } };
 
-  const [pending, recentDecisions] = await Promise.all([
+  const [pending, recentDecisions, defaultHolidayPlan] = await Promise.all([
     prisma.timesheetApproval.findMany({
       where: { approverId: user.id, status: "PENDING", timesheetHeader: headerWhere },
       include: {
         project: { select: { id: true, name: true } },
         timesheetHeader: {
           include: {
-            employee: { select: employeeOptionSelect },
+            employee: { select: { ...employeeOptionSelect, holidayPlanId: true } },
             lines: { include: { task: { include: { project: { include: { client: true } } } } } },
             approvalHistory: { orderBy: { createdAt: "desc" }, take: 1 },
           },
@@ -71,7 +72,33 @@ export default async function ManagerDashboard({
       orderBy: { updatedAt: "desc" },
       take: 10,
     }),
+    prisma.holidayPlan.findFirst({ where: { isDefault: true }, select: { id: true } }),
   ]);
+
+  const pendingWeekStarts = pending.map((approval) => approval.timesheetHeader.weekStartDate);
+  const holidayPlanIds = [...new Set(
+    pending
+      .map((approval) => approval.timesheetHeader.employee.holidayPlanId ?? defaultHolidayPlan?.id)
+      .filter((planId): planId is string => Boolean(planId))
+  )];
+  const holidays = pendingWeekStarts.length > 0 && holidayPlanIds.length > 0
+    ? await prisma.holiday.findMany({
+        where: {
+          holidayPlanId: { in: holidayPlanIds },
+          date: {
+            gte: new Date(Math.min(...pendingWeekStarts.map((date) => date.getTime()))),
+            lte: addDays(new Date(Math.max(...pendingWeekStarts.map((date) => date.getTime()))), 6),
+          },
+        },
+        select: { holidayPlanId: true, date: true, name: true },
+      })
+    : [];
+  const holidaysByPlan = new Map<string, Record<string, string>>();
+  for (const holiday of holidays) {
+    const forPlan = holidaysByPlan.get(holiday.holidayPlanId) ?? {};
+    forPlan[toISODate(holiday.date)] = holiday.name;
+    holidaysByPlan.set(holiday.holidayPlanId, forPlan);
+  }
 
   const approvalsData: ApprovalRowData[] = pending.map((approval) => {
     const t = approval.timesheetHeader;
@@ -94,6 +121,12 @@ export default async function ManagerDashboard({
       byTask.get(key)!.notesByDate[toISODate(line.workDate)] = line.notes ?? "";
     }
     const projectHours = projectLines.reduce((s, l) => s + Number(l.hours), 0);
+    const loggedHoursByDate = t.lines.reduce<Record<string, number>>((hours, line) => {
+      const date = toISODate(line.workDate);
+      hours[date] = (hours[date] ?? 0) + Number(line.hours);
+      return hours;
+    }, {});
+    const holidayPlanId = t.employee.holidayPlanId ?? defaultHolidayPlan?.id;
 
     return {
       approvalId: approval.id,
@@ -105,6 +138,11 @@ export default async function ManagerDashboard({
       projectHours,
       dates,
       lines: Array.from(byTask.values()).sort((a, b) => a.taskName.localeCompare(b.taskName)),
+      holidays: reviewHolidaysForWeek({
+        dates,
+        holidayNamesByDate: holidayPlanId ? (holidaysByPlan.get(holidayPlanId) ?? {}) : {},
+        loggedHoursByDate,
+      }),
       submitComments: t.approvalHistory[0]?.comments ?? "",
     };
   });

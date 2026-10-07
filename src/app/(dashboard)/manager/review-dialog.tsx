@@ -17,7 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { WEEKDAY_LABELS } from "@/lib/dates";
+import { formatDisplayDate, WEEKDAY_LABELS } from "@/lib/dates";
+import type { ReviewHoliday } from "@/lib/review-holidays";
 import { approveProjectApproval, rejectProjectApproval } from "./actions";
 import { captureDashboardScroll, restoreDashboardScroll } from "@/lib/dashboard-scroll";
 
@@ -36,6 +37,7 @@ export function ReviewDialog({
   projectName,
   dates,
   lines,
+  holidays,
   submitComments,
   open,
   onOpenChange,
@@ -45,6 +47,7 @@ export function ReviewDialog({
   projectName: string;
   dates: string[];
   lines: ReviewLine[];
+  holidays: ReviewHoliday[];
   submitComments: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -118,6 +121,12 @@ export function ReviewDialog({
                 {dates.map((date, i) => (
                   <TableHead key={date} className="text-center">
                     {WEEKDAY_LABELS[i]}
+                    <div className="mt-0.5 text-[10px] font-normal text-muted-foreground">
+                      {formatDisplayDate(date)}
+                    </div>
+                    {holidays.find((holiday) => holiday.date === date) && (
+                      <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Holiday</div>
+                    )}
                   </TableHead>
                 ))}
                 <TableHead className="text-center">Total</TableHead>
@@ -162,6 +171,21 @@ export function ReviewDialog({
             </TableBody>
           </Table>
         </div>
+
+        {holidays.length > 0 && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-950">
+            <span className="font-semibold">Holiday calendar: </span>
+            {holidays.map((holiday, index) => (
+              <span key={holiday.date}>
+                {index > 0 && "; "}
+                {formatDisplayDate(holiday.date)} — {holiday.name}
+                {holiday.creditedHours > 0
+                  ? ` (automatic ${holiday.creditedHours} hours, not assigned to a project)`
+                  : " (work logged on this holiday)"}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Render daily notes */}
         <div className="flex flex-col gap-1.5 border-t pt-3">

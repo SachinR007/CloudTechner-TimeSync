@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, type ReviewLine } from "./review-dialog";
+import type { ReviewHoliday } from "@/lib/review-holidays";
 
 export function ReviewButton({
   approvalId,
@@ -10,6 +11,7 @@ export function ReviewButton({
   projectName,
   dates,
   lines,
+  holidays,
   submitComments,
 }: {
   approvalId: string;
@@ -17,6 +19,7 @@ export function ReviewButton({
   projectName: string;
   dates: string[];
   lines: ReviewLine[];
+  holidays: ReviewHoliday[];
   submitComments: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +35,7 @@ export function ReviewButton({
         projectName={projectName}
         dates={dates}
         lines={lines}
+        holidays={holidays}
         submitComments={submitComments}
         open={open}
         onOpenChange={setOpen}
